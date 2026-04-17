@@ -124,6 +124,15 @@ final class MetalRenderer: NSObject, MTKViewDelegate {
         // Sync dirty display region.
         _ = st80_display_sync()
 
+        // Image requested quit via primitive 113.
+        if st80_quit_requested() != 0 {
+            st80Log("primitiveQuit signalled — terminating app")
+            st80_stop()
+            st80_shutdown()
+            NSApp.terminate(nil)
+            return
+        }
+
         // Keep the native cursor in sync with the image's current
         // `set_cursor_image` form.
         if let st80View = view as? St80MTKView {
@@ -154,6 +163,22 @@ final class MetalRenderer: NSObject, MTKViewDelegate {
               let cmd = commandQueue.makeCommandBuffer(),
               let enc = cmd.makeRenderCommandEncoder(descriptor: rpd) else {
             return
+        }
+
+        // Letterbox to preserve the VM display's aspect ratio.
+        let drawableW = Double(view.drawableSize.width)
+        let drawableH = Double(view.drawableSize.height)
+        let vmW = Double(textureWidth)
+        let vmH = Double(textureHeight)
+        if drawableW > 0 && drawableH > 0 && vmW > 0 && vmH > 0 {
+            let scale = min(drawableW / vmW, drawableH / vmH)
+            let vpW = vmW * scale
+            let vpH = vmH * scale
+            enc.setViewport(MTLViewport(
+                originX: (drawableW - vpW) * 0.5,
+                originY: (drawableH - vpH) * 0.5,
+                width: vpW, height: vpH,
+                znear: 0.0, zfar: 1.0))
         }
 
         enc.setRenderPipelineState(pipeline)

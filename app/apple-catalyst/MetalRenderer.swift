@@ -95,6 +95,17 @@ final class MetalRenderer: NSObject, MTKViewDelegate {
         _ = st80_run(cyclesPerFrame)
         _ = st80_display_sync()
 
+        if st80_quit_requested() != 0 {
+            st80Log("primitiveQuit signalled — terminating app")
+            st80_stop()
+            st80_shutdown()
+            exit(0)
+        }
+
+        if let st80View = view as? St80MTKView {
+            st80View.refreshCursorIfChanged()
+        }
+
         let w = Int(st80_display_width())
         let h = Int(st80_display_height())
         if w > 0 && h > 0, let pixels = st80_display_pixels() {
@@ -117,6 +128,26 @@ final class MetalRenderer: NSObject, MTKViewDelegate {
               let cmd = commandQueue.makeCommandBuffer(),
               let enc = cmd.makeRenderCommandEncoder(descriptor: rpd) else {
             return
+        }
+
+        // Letterbox: fit the VM display inside the drawable preserving
+        // its 1-bit aspect ratio. Empty margin renders as the view's
+        // clear colour (black). Without this the shader stretches the
+        // Xerox 1983 bitmap and text loses its shape.
+        let drawableW = Double(view.drawableSize.width)
+        let drawableH = Double(view.drawableSize.height)
+        let vmW = Double(textureWidth)
+        let vmH = Double(textureHeight)
+        if drawableW > 0 && drawableH > 0 && vmW > 0 && vmH > 0 {
+            let scale = min(drawableW / vmW, drawableH / vmH)
+            let vpW = vmW * scale
+            let vpH = vmH * scale
+            let originX = (drawableW - vpW) * 0.5
+            let originY = (drawableH - vpH) * 0.5
+            enc.setViewport(MTLViewport(
+                originX: originX, originY: originY,
+                width: vpW, height: vpH,
+                znear: 0.0, zfar: 1.0))
         }
 
         enc.setRenderPipelineState(pipeline)

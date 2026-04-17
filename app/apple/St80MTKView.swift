@@ -114,16 +114,32 @@ final class St80MTKView: MTKView {
 
     // MARK: - Coordinate mapping
 
+    // Rectangle (in view-bounds, Y-up) the VM's fixed-size display
+    // actually renders into. Renderer letterboxes to preserve the
+    // 1-bit display's aspect ratio; hit-testing matches.
+    private func vmContentRect() -> CGRect {
+        let vmW = CGFloat(st80_display_width())
+        let vmH = CGFloat(st80_display_height())
+        guard vmW > 0, vmH > 0, bounds.width > 0, bounds.height > 0 else {
+            return bounds
+        }
+        let scale = min(bounds.width / vmW, bounds.height / vmH)
+        let w = vmW * scale
+        let h = vmH * scale
+        return CGRect(x: (bounds.width - w) * 0.5,
+                      y: (bounds.height - h) * 0.5,
+                      width: w, height: h)
+    }
+
     private func vmCoords(for event: NSEvent) -> (Int32, Int32)? {
         let pt = convert(event.locationInWindow, from: nil)
+        let rect = vmContentRect()
+        guard rect.width > 0, rect.height > 0 else { return nil }
         let vmW = st80_display_width()
         let vmH = st80_display_height()
-        guard vmW > 0, vmH > 0, bounds.width > 0, bounds.height > 0 else {
-            return nil
-        }
         // NSView has Y-up; VM display has Y-down (BitBlt convention).
-        let sx = pt.x / bounds.width * CGFloat(vmW)
-        let sy = (bounds.height - pt.y) / bounds.height * CGFloat(vmH)
+        let sx = (pt.x - rect.minX) / rect.width * CGFloat(vmW)
+        let sy = (rect.maxY - pt.y) / rect.height * CGFloat(vmH)
         let x = Int32(sx.clamped(0, CGFloat(vmW - 1)))
         let y = Int32(sy.clamped(0, CGFloat(vmH - 1)))
         return (x, y)
