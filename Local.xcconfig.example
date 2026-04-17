@@ -1,0 +1,9 @@
+// Copy this file to Local.xcconfig and fill in your Apple Developer
+// Team ID. Local.xcconfig is gitignored and will not be committed.
+//
+// You can find your Team ID at https://developer.apple.com/account
+// → Membership, or via `xcrun security find-identity -p codesigning`
+// looking for the (XXXXXXXXXX) suffix on your "Apple Development"
+// certificate.
+
+DEVELOPMENT_TEAM = YOUR_TEAM_ID_HERE

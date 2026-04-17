@@ -1,0 +1,3 @@
+Runtime resources bundled with the app. Does NOT include the Xerox
+virtual image — that is fetched at runtime from
+http://www.wolczko.com/st80/image.tar.gz under its own license.

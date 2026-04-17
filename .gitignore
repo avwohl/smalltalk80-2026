@@ -1,0 +1,68 @@
+# Local configuration (team ID, signing)
+Local.xcconfig
+
+# Build outputs
+*.o
+*.a
+*.dSYM/
+build/
+build-app/
+build-macos/
+build-sim/
+build-cpp/
+build-test/
+build-maccatalyst/
+build-catalyst/
+build-catalyst
+build-xcframework/
+build-xcodeproj/
+cmake-build-*/
+
+# Xcode
+DerivedData/
+*.xcworkspace
+Frameworks/
+*.xcuserstate
+xcuserdata/
+*.xcscmblueprint
+*.xccheckout
+
+# Swift Package Manager
+.swiftpm/
+.build/
+Packages/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+Thumbs.db
+
+# Smalltalk-80 image artifacts (not redistributed — fetched separately)
+*.image
+*.changes
+*.sources
+/images/
+/test-images/
+
+# Reference implementation checkouts (cloned separately)
+/reference/
+
+# Archives
+*.zip
+*.tar.gz
+
+# Crash dumps
+*.dmp
+
+# Python
+*.pyc
+__pycache__/

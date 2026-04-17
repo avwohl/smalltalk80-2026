@@ -1,0 +1,13 @@
+Create a private repo avwohl/st80-2026
+Implement Smalltalk-80 initially for MacOS catalyst
+It should also run in iOS
+When working it will port to windows and linux
+For shared code use c++ so max and linux can use it
+It should Smalltalk-80 images from that time period.
+Some implementations that attempt the same thing but dont run on today's OSes:
+https://github.com/dbanay/Smalltalk
+https://github.com/iriyak/Smalltalk
+https://github.com/rochus-keller/Smalltalk
+If you steal imlementation code be sure to credit it and copy the right licenses
+
+We did a modern Pharo smalltalk. See ../iospharo.  Again if you steal code keep the credits and licenses straight.  Note that all the recent work on this project is on a jit fork for to compile Smalltalk

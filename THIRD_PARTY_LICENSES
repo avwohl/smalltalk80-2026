@@ -1,0 +1,77 @@
+THIRD-PARTY SOFTWARE LICENSES
+==============================
+
+st80-2026 contains code ported from the following open source projects.
+Each component retains its original license. No GPL-licensed code is
+linked into the shipping product.
+
+
+================================================================================
+1. dbanay/Smalltalk — PRIMARY PORT SOURCE
+================================================================================
+
+Object memory, BitBlt, interpreter dispatch, primitive table, OOP encoding,
+and the image loader are ported (with modifications) from:
+
+  https://github.com/dbanay/Smalltalk
+  Copyright (c) 2020 Dan Banay
+
+  Licensed under the MIT License.
+
+  Permission is hereby granted, free of charge, to any person obtaining a
+  copy of this software and associated documentation files (the "Software"),
+  to deal in the Software without restriction, including without limitation
+  the rights to use, copy, modify, merge, publish, distribute, sublicense,
+  and/or sell copies of the Software, and to permit persons to whom the
+  Software is furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included
+  in all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+  OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+  THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+  DEALINGS IN THE SOFTWARE.
+
+Files containing ported code from dbanay/Smalltalk carry a header comment
+naming the source file and commit they were derived from.
+
+
+================================================================================
+2. Xerox Smalltalk-80 Virtual Image (v2)
+================================================================================
+
+The virtual image this VM executes is NOT redistributed with st80-2026.
+Users fetch it separately from its canonical location:
+
+  http://www.wolczko.com/st80/image.tar.gz
+
+The image itself is Copyright Xerox Corporation and is distributed by Xerox
+under terms described alongside the image. Refer to the image's accompanying
+documentation for the exact terms of use.
+
+
+================================================================================
+3. Blue Book
+================================================================================
+
+"Smalltalk-80: The Language and its Implementation"
+Adele Goldberg and David Robson. Addison-Wesley, 1983. ISBN 0-201-11371-6.
+
+The Blue Book is the specification this implementation follows. The book
+itself is copyrighted; this project references its chapter and section
+numbers as documentation and does not reproduce the text.
+
+
+================================================================================
+4. rochus-keller/Smalltalk — REFERENCE ONLY (not linked)
+================================================================================
+
+https://github.com/rochus-keller/Smalltalk is licensed GPL-2.0, which is
+incompatible with this project's MIT license. Its code is NOT used,
+copied, or linked here. Its Image Viewer tool is useful for inspecting
+the Xerox v2 image format during development but plays no role at build
+or run time of st80-2026.

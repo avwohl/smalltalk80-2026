@@ -1,0 +1,390 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		B10001 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20001 /* AppDelegate.swift */; };
+		B10002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20002 /* ContentView.swift */; };
+		B10003 /* MetalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20003 /* MetalView.swift */; };
+		B10004 /* MetalRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20004 /* MetalRenderer.swift */; };
+		B10005 /* St80MTKView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20005 /* St80MTKView.swift */; };
+		B10010 /* St80Image.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20014 /* St80Image.swift */; };
+		B10011 /* ImageManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20015 /* ImageManager.swift */; };
+		B10012 /* ImageLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20016 /* ImageLibraryView.swift */; };
+		B10006 /* Shaders.metal in Resources */ = {isa = PBXBuildFile; fileRef = B20006 /* Shaders.metal */; };
+		B10007 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B20007 /* Assets.xcassets */; };
+		B10008 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B20010 /* Metal.framework */; };
+		B10009 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B20011 /* MetalKit.framework */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		B20001 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		B20002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		B20003 /* MetalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalView.swift; sourceTree = "<group>"; };
+		B20004 /* MetalRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalRenderer.swift; sourceTree = "<group>"; };
+		B20005 /* St80MTKView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = St80MTKView.swift; sourceTree = "<group>"; };
+		B20006 /* Shaders.metal */ = {isa = PBXFileReference; lastKnownFileType = text; path = Shaders.metal; sourceTree = "<group>"; };
+		B20007 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		B20008 /* st80.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = st80.entitlements; sourceTree = "<group>"; };
+		B20009 /* Bridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Bridge.h; path = src/include/Bridge.h; sourceTree = "<group>"; };
+		B20010 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
+		B20011 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
+		B20012 /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
+		B20013 /* St80.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = St80.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B20014 /* St80Image.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = St80Image.swift; sourceTree = "<group>"; };
+		B20015 /* ImageManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageManager.swift; sourceTree = "<group>"; };
+		B20016 /* ImageLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageLibraryView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		B30001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B10008 /* Metal.framework in Frameworks */,
+				B10009 /* MetalKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		B40001 = {
+			isa = PBXGroup;
+			children = (
+				B20012 /* Config.xcconfig */,
+				B40002 /* app */,
+				B40006 /* src */,
+				B40005 /* Frameworks */,
+				B40004 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		B40002 /* app */ = {
+			isa = PBXGroup;
+			children = (
+				B40003 /* apple-catalyst */,
+			);
+			path = app;
+			sourceTree = "<group>";
+		};
+		B40003 /* apple-catalyst */ = {
+			isa = PBXGroup;
+			children = (
+				B20001 /* AppDelegate.swift */,
+				B20002 /* ContentView.swift */,
+				B20003 /* MetalView.swift */,
+				B20004 /* MetalRenderer.swift */,
+				B20005 /* St80MTKView.swift */,
+				B20014 /* St80Image.swift */,
+				B20015 /* ImageManager.swift */,
+				B20016 /* ImageLibraryView.swift */,
+				B20006 /* Shaders.metal */,
+				B20007 /* Assets.xcassets */,
+				B20008 /* st80.entitlements */,
+			);
+			path = "apple-catalyst";
+			sourceTree = "<group>";
+		};
+		B40004 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				B20013 /* St80.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		B40005 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				B20010 /* Metal.framework */,
+				B20011 /* MetalKit.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		B40006 /* src */ = {
+			isa = PBXGroup;
+			children = (
+				B20009 /* Bridge.h */,
+			);
+			name = src;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		B50001 /* St80 */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B70001 /* Build configuration list for PBXNativeTarget "St80" */;
+			buildPhases = (
+				B50004 /* Check XCFramework Freshness */,
+				B50002 /* Sources */,
+				B30001 /* Frameworks */,
+				B50003 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = St80;
+			productName = St80;
+			productReference = B20013 /* St80.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		B60001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					B50001 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+				};
+			};
+			buildConfigurationList = B70002 /* Build configuration list for PBXProject "st80" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = B40001;
+			productRefGroup = B40004 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				B50001 /* St80 */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		B50003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B10006 /* Shaders.metal in Resources */,
+				B10007 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		B50004 /* Check XCFramework Freshness */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(PROJECT_DIR)/src/core/ObjectMemory.cpp",
+				"$(PROJECT_DIR)/src/core/ObjectMemory.hpp",
+				"$(PROJECT_DIR)/src/core/Interpreter.cpp",
+				"$(PROJECT_DIR)/src/core/Interpreter.hpp",
+				"$(PROJECT_DIR)/src/core/BitBlt.cpp",
+				"$(PROJECT_DIR)/src/core/BitBlt.hpp",
+				"$(PROJECT_DIR)/src/core/Oops.hpp",
+				"$(PROJECT_DIR)/src/core/RealWordMemory.hpp",
+				"$(PROJECT_DIR)/src/core/core_init.cpp",
+				"$(PROJECT_DIR)/src/platform/apple/AppleHal.cpp",
+				"$(PROJECT_DIR)/src/platform/apple/AppleHal.hpp",
+				"$(PROJECT_DIR)/src/platform/apple/AppleBridge.cpp",
+				"$(PROJECT_DIR)/src/platform/apple/EventQueue.hpp",
+				"$(PROJECT_DIR)/src/platform/posix/PosixFileSystem.hpp",
+				"$(PROJECT_DIR)/src/include/Bridge.h",
+				"$(PROJECT_DIR)/Frameworks/St80Core.xcframework/Info.plist",
+			);
+			name = "Check XCFramework Freshness";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "# Auto-rebuild Frameworks/St80Core.xcframework if any VM source is newer.\nXCFRAMEWORK=\"${PROJECT_DIR}/Frameworks/St80Core.xcframework/Info.plist\"\nNEEDS_REBUILD=0\n\nif [ ! -f \"$XCFRAMEWORK\" ]; then\n    echo \"warning: St80Core.xcframework not found, building...\"\n    NEEDS_REBUILD=1\nelse\n    XCF_TIME=$(stat -f %m \"$XCFRAMEWORK\")\n    for src in \"${PROJECT_DIR}/src/core\"/*.cpp \"${PROJECT_DIR}/src/core\"/*.hpp \"${PROJECT_DIR}/src/platform/apple\"/*.cpp \"${PROJECT_DIR}/src/platform/apple\"/*.hpp \"${PROJECT_DIR}/src/include\"/*.h; do\n        if [ -f \"$src\" ]; then\n            SRC_TIME=$(stat -f %m \"$src\")\n            if [ \"$SRC_TIME\" -gt \"$XCF_TIME\" ]; then\n                echo \"warning: $(basename \"$src\") newer than xcframework, rebuilding...\"\n                NEEDS_REBUILD=1\n                break\n            fi\n        fi\n    done\nfi\n\nif [ \"$NEEDS_REBUILD\" -eq 1 ]; then\n    cd \"${PROJECT_DIR}\"\n    ./scripts/build-xcframework.sh 2>&1 | tail -8\n    if [ ${PIPESTATUS[0]} -ne 0 ]; then\n        echo \"error: build-xcframework.sh failed\"\n        exit 1\n    fi\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		B50002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B10001 /* AppDelegate.swift in Sources */,
+				B10002 /* ContentView.swift in Sources */,
+				B10003 /* MetalView.swift in Sources */,
+				B10004 /* MetalRenderer.swift in Sources */,
+				B10005 /* St80MTKView.swift in Sources */,
+				B10010 /* St80Image.swift in Sources */,
+				B10011 /* ImageManager.swift in Sources */,
+				B10012 /* ImageLibraryView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		B70003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = B20012 /* Config.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++17";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		B70004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = B20012 /* Config.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++17";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		B70005 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "app/apple-catalyst/st80.entitlements";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Smalltalk-80";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIRequiredDeviceCapabilities = "arm64 metal";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.awohl.st80;
+				PRODUCT_NAME = St80;
+				SUPPORTS_MACCATALYST = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "src/include/Bridge.h";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,6";
+			};
+			name = Debug;
+		};
+		B70006 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "app/apple-catalyst/st80.entitlements";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Smalltalk-80";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIRequiredDeviceCapabilities = "arm64 metal";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.awohl.st80;
+				PRODUCT_NAME = St80;
+				SUPPORTS_MACCATALYST = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "src/include/Bridge.h";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,6";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		B70001 /* Build configuration list for PBXNativeTarget "St80" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B70005 /* Debug */,
+				B70006 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B70002 /* Build configuration list for PBXProject "st80" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B70003 /* Debug */,
+				B70004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = B60001 /* Project object */;
+}

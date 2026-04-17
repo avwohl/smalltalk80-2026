@@ -1,0 +1,19 @@
+// Shared build configuration for the St80 Xcode project.
+// Local overrides (team ID, signing) go in Local.xcconfig, which is
+// gitignored and not checked in.
+
+// Select the xcframework slice by SDK. Xcode resolves the right one
+// automatically per build destination (iOS device, iOS simulator,
+// or Mac Catalyst).
+ST80_XCFW_SLICE[sdk=iphoneos*]          = ios-arm64
+ST80_XCFW_SLICE[sdk=macosx*]            = ios-arm64_x86_64-maccatalyst
+ST80_XCFW_SLICE[sdk=iphonesimulator*]   = ios-arm64_x86_64-simulator
+
+ST80_CORE_LIB = $(PROJECT_DIR)/Frameworks/St80Core.xcframework/$(ST80_XCFW_SLICE)/libSt80Core.a
+
+// `-force_load` pulls in every object file in the static library so
+// that no symbols get stripped, which we need because the VM core
+// exposes its API via Bridge.h symbols that Swift looks up lazily.
+OTHER_LDFLAGS = -ObjC -all_load -force_load $(ST80_CORE_LIB)
+
+#include? "Local.xcconfig"
