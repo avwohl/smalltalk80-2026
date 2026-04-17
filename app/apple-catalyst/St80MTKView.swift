@@ -59,17 +59,20 @@ final class St80MTKView: MTKView {
         becomeFirstResponder()
 #if targetEnvironment(macCatalyst)
         installCatalystInteractionsIfNeeded()
+#else
+        installIOSGestureRecognizersIfNeeded()
 #endif
     }
 
-#if targetEnvironment(macCatalyst)
-    // The pending sticky menu — yellow after a right-click, blue after
-    // a middle-click. nil when no menu is held open. The next click of
-    // any kind fires the matching button-up at the click location to
-    // select / dismiss the menu.
+    // The pending sticky menu — yellow after a right-click / long-press,
+    // blue after a middle-click / two-finger tap. nil when no menu is
+    // held open. The next tap of any kind fires the matching button-up
+    // at that location to select the highlighted item or dismiss.
     fileprivate var stickyMenuButton: St80MouseButton?
     fileprivate var suppressNextTouchEnd = false
     fileprivate var suppressNextTouchCancel = false
+
+#if targetEnvironment(macCatalyst)
     private var catalystInteractionsInstalled = false
     // Latest cursor position in our view's coordinate space, updated by
     // UIHoverGestureRecognizer. Used as the anchor for middle-click
@@ -267,6 +270,63 @@ final class St80MTKView: MTKView {
     }
 #endif
 
+#if !targetEnvironment(macCatalyst)
+    // MARK: - iOS gesture recognizers
+    //
+    // iOS (iPad / iPhone) has no middle or right mouse button. We map:
+    //   - single tap / drag          → red (via touchesBegan/Moved/Ended)
+    //   - long-press (0.4s, hold)    → yellow, sticky until next tap
+    //   - two-finger tap             → blue,   sticky until next tap
+    // The sticky state is committed inside touchesBegan above — same
+    // state machine Catalyst uses for right-click / middle-click.
+
+    private var iosGesturesInstalled = false
+
+    private func installIOSGestureRecognizersIfNeeded() {
+        guard !iosGesturesInstalled else { return }
+        iosGesturesInstalled = true
+
+        let yellow = UILongPressGestureRecognizer(
+            target: self, action: #selector(handleYellowLongPress(_:)))
+        yellow.minimumPressDuration = 0.4
+        yellow.allowableMovement = .greatestFiniteMagnitude
+        yellow.cancelsTouchesInView = true
+        addGestureRecognizer(yellow)
+
+        let blue = UITapGestureRecognizer(
+            target: self, action: #selector(handleBlueTwoFingerTap(_:)))
+        blue.numberOfTouchesRequired = 2
+        blue.cancelsTouchesInView = true
+        addGestureRecognizer(blue)
+    }
+
+    @objc private func handleYellowLongPress(_ g: UILongPressGestureRecognizer) {
+        guard g.state == .began else { return }
+        guard let (x, y) = vmCoords(g.location(in: self)) else { return }
+        // Commit any pending blue menu first at the new location, then
+        // open yellow sticky. User's next tap commits yellow.
+        if let pending = stickyMenuButton, pending != ST80_BTN_YELLOW {
+            st80_post_mouse_up(x, y, pending)
+        }
+        st80_post_mouse_move(x, y)
+        st80_post_mouse_down(x, y, ST80_BTN_YELLOW)
+        stickyMenuButton = ST80_BTN_YELLOW
+        // `cancelsTouchesInView = true` means touchesEnded for the
+        // original finger won't fire, so no suppression flags needed.
+    }
+
+    @objc private func handleBlueTwoFingerTap(_ g: UITapGestureRecognizer) {
+        guard g.state == .ended else { return }
+        guard let (x, y) = vmCoords(g.location(in: self)) else { return }
+        if let pending = stickyMenuButton, pending != ST80_BTN_BLUE {
+            st80_post_mouse_up(x, y, pending)
+        }
+        st80_post_mouse_move(x, y)
+        st80_post_mouse_down(x, y, ST80_BTN_BLUE)
+        stickyMenuButton = ST80_BTN_BLUE
+    }
+#endif
+
     // MARK: - Coordinate mapping
 
     // Rectangle (in view-bounds coordinates) within which the VM's
@@ -334,10 +394,12 @@ final class St80MTKView: MTKView {
 #if targetEnvironment(macCatalyst)
         lastHoverLocation = pt
         moveCursorOverlay(to: pt)
+#endif
         // A sticky menu is waiting for a commit. Fire the pending up
         // here so the menu selects / dismisses at the click location.
         // Swallow this touch's later end so no phantom red release
-        // lands on top.
+        // lands on top. Shared across Catalyst and iOS — both
+        // platforms' gesture paths populate `stickyMenuButton`.
         if let pending = stickyMenuButton {
             st80_post_mouse_move(x, y)
             st80_post_mouse_up(x, y, pending)
@@ -347,7 +409,6 @@ final class St80MTKView: MTKView {
             suppressNextTouchCancel = true
             return
         }
-#endif
 
         let b = Self.button(for: t, event: event)
         currentButton = b
@@ -366,24 +427,20 @@ final class St80MTKView: MTKView {
     }
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
-#if targetEnvironment(macCatalyst)
         if suppressNextTouchEnd {
             suppressNextTouchEnd = false
             return
         }
-#endif
         guard let t = touches.first,
               let (x, y) = vmCoords(t.location(in: self)) else { return }
         st80_post_mouse_up(x, y, currentButton)
     }
 
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
-#if targetEnvironment(macCatalyst)
         if suppressNextTouchCancel {
             suppressNextTouchCancel = false
             return
         }
-#endif
         guard let t = touches.first,
               let (x, y) = vmCoords(t.location(in: self)) else { return }
         st80_post_mouse_up(x, y, currentButton)

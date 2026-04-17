@@ -102,9 +102,11 @@ final class MetalRenderer: NSObject, MTKViewDelegate {
             exit(0)
         }
 
+#if targetEnvironment(macCatalyst)
         if let st80View = view as? St80MTKView {
             st80View.refreshCursorIfChanged()
         }
+#endif
 
         let w = Int(st80_display_width())
         let h = Int(st80_display_height())
