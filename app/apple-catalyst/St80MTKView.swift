@@ -80,18 +80,24 @@ final class St80MTKView: MTKView {
     private var nsEventMonitor: Any?
 
     // Custom cursor overlay. UIKit's UIPointerStyle can't carry an
-    // arbitrary bitmap, so we hide the system pointer over our view
-    // (`UIPointerStyle.hidden()`) and paint the Smalltalk 16×16
-    // cursor form into a UIImageView that follows the hover position.
+    // arbitrary bitmap, so when the image has set a non-zero cursor
+    // form we hide the system pointer via `UIPointerStyle.hidden()`
+    // and paint the Smalltalk 16×16 cursor into a UIImageView that
+    // tracks the hover position. When the image hasn't set a custom
+    // cursor (boot state, or cursor form is all-zero) we leave the
+    // system pointer visible so the user isn't left with no cursor.
     private var cursorOverlay: UIImageView?
     private var lastCursorHash: UInt64 = 0
+    private var pointerInteraction: UIPointerInteraction?
 
     private func installCatalystInteractionsIfNeeded() {
         guard !catalystInteractionsInstalled else { return }
         catalystInteractionsInstalled = true
 
         addInteraction(UIContextMenuInteraction(delegate: self))
-        addInteraction(UIPointerInteraction(delegate: self))
+        let pointer = UIPointerInteraction(delegate: self)
+        addInteraction(pointer)
+        pointerInteraction = pointer
 
         let overlay = UIImageView(
             frame: CGRect(x: 0, y: 0, width: 16, height: 16))
@@ -145,8 +151,15 @@ final class St80MTKView: MTKView {
         lastCursorHash = h
 
         let img = Self.makeCursorImage(from: bits)
+        let hadImage = cursorOverlay?.image != nil
         cursorOverlay?.image = img
         if img == nil { cursorOverlay?.isHidden = true }
+        // If we gained or lost a custom cursor image, tell the
+        // pointer interaction to re-query our style so the system
+        // pointer toggles between visible and hidden.
+        if hadImage != (img != nil) {
+            pointerInteraction?.invalidate()
+        }
     }
 
     private static func makeCursorImage(from bits: [UInt16]) -> UIImage? {
@@ -426,13 +439,12 @@ final class St80MTKView: MTKView {
 
 #if targetEnvironment(macCatalyst)
 extension St80MTKView: UIPointerInteractionDelegate {
-    // Hide the system pointer over our view so the cursor overlay we
-    // paint ourselves is the only pointer visible. Returning nil here
-    // also results in the default pointer, so we must explicitly
-    // return `.hidden()`.
+    // Hide the system pointer only when we have a Smalltalk cursor
+    // bitmap to paint in its place. When we don't, return nil so
+    // Catalyst shows the default macOS pointer.
     func pointerInteraction(_ interaction: UIPointerInteraction,
                             styleFor region: UIPointerRegion) -> UIPointerStyle? {
-        return .hidden()
+        return cursorOverlay?.image != nil ? .hidden() : nil
     }
 }
 

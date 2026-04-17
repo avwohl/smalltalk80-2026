@@ -162,6 +162,67 @@ final class ImageManager: ObservableObject {
         }
     }
 
+    // MARK: - Import
+
+    /// Copy a user-picked image file (plus any `.sources` / `.changes`
+    /// companions sitting next to it) into the sandboxed Images dir
+    /// and register it. `url` is typically a security-scoped URL from
+    /// UIDocumentPicker or SwiftUI `.fileImporter`.
+    func importImage(from url: URL) {
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+
+        let imageFile = url.lastPathComponent
+        let base = (imageFile as NSString).deletingPathExtension
+        let slug = Self.makeSlug(from: base)
+            + "-" + UUID().uuidString.prefix(4).lowercased()
+        let destDir = St80Image.imagesRoot
+            .appendingPathComponent(slug, isDirectory: true)
+
+        do {
+            try fm.createDirectory(at: destDir,
+                                   withIntermediateDirectories: true)
+            try fm.copyItem(at: url,
+                            to: destDir.appendingPathComponent(imageFile))
+
+            // Copy companion files from the source directory if they
+            // exist: classic Smalltalk-80 ships `<name>.sources` and
+            // `<name>.changes` next to the image.
+            let srcDir = url.deletingLastPathComponent()
+            for companion in ["Smalltalk-80.sources", "Smalltalk-80.changes",
+                              "\(base).sources", "\(base).changes"] {
+                let src = srcDir.appendingPathComponent(companion)
+                if fm.fileExists(atPath: src.path) {
+                    try? fm.copyItem(at: src,
+                                     to: destDir.appendingPathComponent(companion))
+                }
+            }
+
+            let entry = St80Image(
+                id: UUID(),
+                name: base.isEmpty ? "Imported image" : base,
+                directoryName: slug,
+                imageFileName: imageFile,
+                addedAt: Date())
+            images.append(entry)
+            selectedImageID = entry.id
+            save()
+        } catch {
+            errorMessage = "Import failed: \(error.localizedDescription)"
+        }
+    }
+
+    private static func makeSlug(from name: String) -> String {
+        let allowed = Set("abcdefghijklmnopqrstuvwxyz0123456789-")
+        let lower = name.lowercased()
+        var out = ""
+        for ch in lower {
+            if allowed.contains(ch) { out.append(ch) }
+            else if ch == " " || ch == "_" || ch == "." { out.append("-") }
+        }
+        return out.isEmpty ? "image" : String(out.prefix(40))
+    }
+
     // MARK: - Delete
 
     func deleteImage(_ image: St80Image) {

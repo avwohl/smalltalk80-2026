@@ -6,6 +6,7 @@
 // button. Delete via swipe.
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ImageLibraryView: View {
 
@@ -13,6 +14,7 @@ struct ImageLibraryView: View {
     let onLaunch: (St80Image) -> Void
 
     @State private var showingAbout = false
+    @State private var showingImporter = false
 
     var body: some View {
         VStack(spacing: 24) {
@@ -42,11 +44,29 @@ struct ImageLibraryView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear { manager.load() }
         .sheet(isPresented: $showingAbout) { AboutView() }
+        .fileImporter(isPresented: $showingImporter,
+                      allowedContentTypes: [.data],
+                      allowsMultipleSelection: false) { result in
+            if case .success(let urls) = result, let url = urls.first {
+                manager.importImage(from: url)
+            } else if case .failure(let err) = result {
+                manager.errorMessage = "Import failed: \(err.localizedDescription)"
+            }
+        }
     }
 
     private var topBar: some View {
         HStack {
+            Button {
+                showingImporter = true
+            } label: {
+                Image(systemName: "plus.circle")
+                    .font(.title2)
+            }
+            .accessibilityLabel("Add image from file")
+
             Spacer()
+
             Button {
                 showingAbout = true
             } label: {
@@ -95,6 +115,15 @@ struct ImageLibraryView: View {
                 .buttonStyle(.borderedProminent)
                 .disabled(manager.isDownloading)
             }
+
+            Button {
+                showingImporter = true
+            } label: {
+                Label("Add image from file…", systemImage: "folder.badge.plus")
+                    .font(.subheadline)
+            }
+            .buttonStyle(.bordered)
+            .padding(.top, 6)
         }
         .padding(.top, 12)
     }
