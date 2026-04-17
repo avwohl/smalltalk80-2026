@@ -1,5 +1,9 @@
 # Mac Smalltalk80 — Remaining Work (excl. JIT & iOS)
 
+Mac Catalyst-only punch list. iOS-specific work lives in
+`docs/ios-plan.md`; the shared C++ core is in Phase-5 territory
+tracked via `docs/interpreter-audit.md`.
+
 Rewritten 2026-04-17 after the polish sweep. Items 1–5 and 10–12 from
 the first pass shipped; what's left is below.
 
