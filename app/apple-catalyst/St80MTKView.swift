@@ -512,6 +512,67 @@ final class St80MTKView: MTKView {
     }
 }
 
+// MARK: - UIKeyInput (iOS soft keyboard)
+//
+// On iOS, conforming to UIKeyInput + being first responder causes
+// UIKit to pop up the soft keyboard. Each typed character arrives
+// via `insertText(_:)`; backspace via `deleteBackward()`. Hardware
+// keyboard input keeps working through `pressesBegan` above; we
+// only take this branch for the iPad soft keyboard. Mac Catalyst
+// never needs this (hardware keyboard or external).
+#if !targetEnvironment(macCatalyst)
+extension St80MTKView: UIKeyInput {
+
+    var hasText: Bool { true }
+
+    func insertText(_ text: String) {
+        for scalar in text.unicodeScalars {
+            var code = Int32(scalar.value)
+            switch scalar.value {
+            case 0x0A: code = 13        // LF → CR
+            case 0x09: break            // leave TAB as-is
+            default:
+                if code < 0x20 || code > 0x7E { continue }
+            }
+            st80_post_key_down(code, 0)
+        }
+    }
+
+    func deleteBackward() {
+        st80_post_key_down(8, 0)        // ASCII BS
+    }
+}
+
+// Disable autocorrect / smart-quotes / predictive features — the
+// Blue Book keyboard decoder wants raw ASCII, not "smart" text.
+extension St80MTKView: UITextInputTraits {
+
+    // Each accessor must return the UIKit value but also accept a
+    // setter; UIKit calls them. Ignore the set.
+    @objc var autocorrectionType: UITextAutocorrectionType {
+        get { .no } set {}
+    }
+    @objc var autocapitalizationType: UITextAutocapitalizationType {
+        get { .none } set {}
+    }
+    @objc var spellCheckingType: UITextSpellCheckingType {
+        get { .no } set {}
+    }
+    @objc var smartQuotesType: UITextSmartQuotesType {
+        get { .no } set {}
+    }
+    @objc var smartDashesType: UITextSmartDashesType {
+        get { .no } set {}
+    }
+    @objc var smartInsertDeleteType: UITextSmartInsertDeleteType {
+        get { .no } set {}
+    }
+    @objc var keyboardType: UIKeyboardType {
+        get { .asciiCapable } set {}
+    }
+}
+#endif
+
 #if targetEnvironment(macCatalyst)
 extension St80MTKView: UIPointerInteractionDelegate {
     // Hide the system pointer only when we have a Smalltalk cursor
