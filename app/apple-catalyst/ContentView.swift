@@ -8,8 +8,16 @@ import SwiftUI
 
 struct ContentView: View {
 
+    // Remember the last-launched image path so the app can skip the
+    // library view on next launch. We store a path rather than a UUID
+    // so that even if the catalog was rewritten, the app still
+    // finds its last image as long as the file exists on disk.
+    private static let lastImagePathKey = "st80.lastImagePath"
+
     @StateObject private var manager = ImageManager.shared
-    @State private var launchedImagePath: String? = nil
+    @State private var launchedImagePath: String? =
+        UserDefaults.standard.string(forKey: lastImagePathKey)
+            .flatMap { FileManager.default.fileExists(atPath: $0) ? $0 : nil }
     @State private var showingAbout = false
     @State private var showingExport = false
 
@@ -34,6 +42,8 @@ struct ContentView: View {
                 ImageLibraryView(manager: manager) { image in
                     launchedImagePath = image.imagePath
                     manager.selectedImageID = image.id
+                    UserDefaults.standard.set(image.imagePath,
+                                              forKey: Self.lastImagePathKey)
                 }
             }
         }
