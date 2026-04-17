@@ -99,6 +99,70 @@ where the keyboard would re-fire keyDown events after layout
 settled; comments in their `PharoCanvasView.swift` around layout
 freezing describe the workaround. Expect to need similar discipline.
 
+### Phase 3.2.5 — Control strip (0.5–1 day)
+
+The iOS soft keyboard is missing the keys Smalltalk actually needs —
+Ctrl, Cmd (for desktop-style shortcuts), Esc, Tab, arrows. Port
+iospharo's vertical control strip as a left-edge overlay. It's
+MIT (same author), so direct port + attribution in
+`THIRD_PARTY_LICENSES`.
+
+Buttons we need, in priority order:
+
+1. **Ctrl toggle** — one-shot modifier. Tap to arm, next key press
+   consumes it. Symbol `control`. State stored in a view-model
+   observable so `insertText` / `pressesBegan` can read it.
+2. **Cmd toggle** — same pattern. Symbol `command`.
+3. **Esc** — sends ASCII 27. No modifier.
+4. **Tab** — sends 9. Useful for browser pane-switching.
+5. **Backspace** — sends 8. The soft keyboard has one but the strip
+   copy stays accessible when the keyboard is hidden.
+6. **Keyboard toggle** — show/hide the soft keyboard. Saves a corner
+   of screen real estate when not typing.
+
+Source to mirror: `iospharo/iospharo/App/ContentView.swift` —
+`StripButton` view (drop in near-verbatim), the `ctrlModifierActive`
+/ `cmdModifierActive` published state on `PharoBridge` (we'd add
+equivalent on a new `St80KeyboardState` observable, not on the C
+bridge), and the vertical `VStack` layout in the body.
+
+Blue Book-specific trim: drop the DoIt / PrintIt / InspectIt / Debug
+buttons — those are Pharo conventions. Add a Yellow-button / Blue-
+button shortcut instead (tap either while a touch is active to
+force that menu, bypassing long-press / two-finger).
+
+### Phase 3.2.6 — Strip geometry (half-day)
+
+Place the strip on the leading edge of the screen in landscape,
+respecting device corners / Dynamic Island / notch / home indicator.
+`../claude-skills/skills/device-geometry.md` has the authoritative
+squircle formula (n=5 superellipse) and a worked table of R / SA
+values per device. Do **not** hand-pick padding constants — use the
+formula at runtime so layout stays correct on every iPhone model.
+
+Required runtime work:
+
+1. Read `window.safeAreaInsets.leading` + `.bottom` from the hosted
+   `UIWindow` to derive display corner radius R and home-indicator
+   inset. Lookup table in the skill doc maps SA_leading → R.
+2. For each strip button stacked from the top or bottom corner,
+   compute `y_min = R - (R^5 - (R - button_left_x)^5)^(1/5)`
+   where `button_left_x = (stripWidth - buttonSize) / 2`. Add
+   ~2 pt visual breathing room.
+3. On Dynamic Island iPhones in landscape, the DI occupies ~127 pt
+   vertically at the leading edge centre. Split the strip into
+   "above DI" and "below DI" zones; place Ctrl/Cmd/keyboard-toggle
+   in the top zone, action buttons in the bottom zone, centred in
+   their respective zones.
+4. On iPads (R=18) the corner intrusion is small (<2 pt at x=4);
+   a static 28 pt top padding clears the Smalltalk menu bar + the
+   corner.
+
+Reference implementation: the `iPhoneTopPadding` /
+`iPhoneBottomPadding` / `squircleIntrusion` computed properties in
+iospharo's `ContentView.swift` (roughly lines 400–505). Port
+verbatim — the geometry math isn't Pharo-specific.
+
 ### Phase 3.3 — Adaptive layout (0.5 day)
 
 - Library view: keep the SwiftUI List; it adapts to iPad fine as-is.
