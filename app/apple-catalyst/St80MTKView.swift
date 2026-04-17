@@ -124,10 +124,9 @@ final class St80MTKView: MTKView {
     @objc private func handleHover(_ g: UIHoverGestureRecognizer) {
         let pt = g.location(in: self)
         lastHoverLocation = pt
-        cursorOverlay?.frame.origin = pt
         switch g.state {
         case .began, .changed:
-            cursorOverlay?.isHidden = (cursorOverlay?.image == nil)
+            moveCursorOverlay(to: pt)
         case .ended, .cancelled, .failed:
             cursorOverlay?.isHidden = true
         default:
@@ -135,6 +134,17 @@ final class St80MTKView: MTKView {
         }
         guard let (x, y) = vmCoords(pt) else { return }
         st80_post_mouse_move(x, y)
+    }
+
+    // Move the overlay to `pt` and show it iff we actually have a
+    // Smalltalk cursor bitmap to paint. Shared between hover and the
+    // touchesBegan/Moved paths so the overlay tracks the pointer
+    // during click-drag too (UIHoverGestureRecognizer stops firing
+    // while any button is held).
+    private func moveCursorOverlay(to pt: CGPoint) {
+        guard let overlay = cursorOverlay else { return }
+        overlay.frame.origin = pt
+        overlay.isHidden = (overlay.image == nil)
     }
 
     // Called each frame by `MetalRenderer.draw(in:)`. Polls the VM
@@ -317,10 +327,13 @@ final class St80MTKView: MTKView {
     }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard let t = touches.first,
-              let (x, y) = vmCoords(t.location(in: self)) else { return }
+        guard let t = touches.first else { return }
+        let pt = t.location(in: self)
+        guard let (x, y) = vmCoords(pt) else { return }
 
 #if targetEnvironment(macCatalyst)
+        lastHoverLocation = pt
+        moveCursorOverlay(to: pt)
         // A sticky menu is waiting for a commit. Fire the pending up
         // here so the menu selects / dismisses at the click location.
         // Swallow this touch's later end so no phantom red release
@@ -342,8 +355,13 @@ final class St80MTKView: MTKView {
     }
 
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard let t = touches.first,
-              let (x, y) = vmCoords(t.location(in: self)) else { return }
+        guard let t = touches.first else { return }
+        let pt = t.location(in: self)
+        guard let (x, y) = vmCoords(pt) else { return }
+#if targetEnvironment(macCatalyst)
+        lastHoverLocation = pt
+        moveCursorOverlay(to: pt)
+#endif
         st80_post_mouse_move(x, y)
     }
 

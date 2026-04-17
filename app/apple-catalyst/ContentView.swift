@@ -16,8 +16,12 @@ struct ContentView: View {
     var body: some View {
         Group {
             if let path = launchedImagePath {
+                // Don't extend under the Mac title bar — clicks on the
+                // top strip were being interpreted as "drag the window"
+                // before reaching the MTKView. Still extend to the
+                // other edges for maximum VM canvas.
                 MetalView(imagePath: path)
-                    .ignoresSafeArea()
+                    .ignoresSafeArea(.container, edges: [.leading, .trailing, .bottom])
             } else {
                 ImageLibraryView(manager: manager) { image in
                     launchedImagePath = image.imagePath
