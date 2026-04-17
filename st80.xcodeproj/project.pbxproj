@@ -17,6 +17,8 @@
 		B10012 /* ImageLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20016 /* ImageLibraryView.swift */; };
 		B10013 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20017 /* AboutView.swift */; };
 		B10014 /* DocumentExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20018 /* DocumentExporter.swift */; };
+		B10015 /* St80InputController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20019 /* St80InputController.swift */; };
+		B10016 /* ControlStripView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20020 /* ControlStripView.swift */; };
 		B10006 /* Shaders.metal in Resources */ = {isa = PBXBuildFile; fileRef = B20006 /* Shaders.metal */; };
 		B10007 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B20007 /* Assets.xcassets */; };
 		B10008 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B20010 /* Metal.framework */; };
@@ -42,6 +44,8 @@
 		B20016 /* ImageLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageLibraryView.swift; sourceTree = "<group>"; };
 		B20017 /* AboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
 		B20018 /* DocumentExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentExporter.swift; sourceTree = "<group>"; };
+		B20019 /* St80InputController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = St80InputController.swift; sourceTree = "<group>"; };
+		B20020 /* ControlStripView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlStripView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -89,6 +93,8 @@
 				B20016 /* ImageLibraryView.swift */,
 				B20017 /* AboutView.swift */,
 				B20018 /* DocumentExporter.swift */,
+				B20019 /* St80InputController.swift */,
+				B20020 /* ControlStripView.swift */,
 				B20006 /* Shaders.metal */,
 				B20007 /* Assets.xcassets */,
 				B20008 /* st80.entitlements */,
@@ -240,6 +246,8 @@
 				B10012 /* ImageLibraryView.swift in Sources */,
 				B10013 /* AboutView.swift in Sources */,
 				B10014 /* DocumentExporter.swift in Sources */,
+				B10015 /* St80InputController.swift in Sources */,
+				B10016 /* ControlStripView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

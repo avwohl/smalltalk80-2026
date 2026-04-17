@@ -20,8 +20,16 @@ struct ContentView: View {
                 // top strip were being interpreted as "drag the window"
                 // before reaching the MTKView. Still extend to the
                 // other edges for maximum VM canvas.
+                #if targetEnvironment(macCatalyst)
                 MetalView(imagePath: path)
                     .ignoresSafeArea(.container, edges: [.leading, .trailing, .bottom])
+                #else
+                HStack(spacing: 0) {
+                    ControlStripView()
+                    MetalView(imagePath: path)
+                }
+                .ignoresSafeArea(.container, edges: .bottom)
+                #endif
             } else {
                 ImageLibraryView(manager: manager) { image in
                     launchedImagePath = image.imagePath

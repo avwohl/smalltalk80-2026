@@ -56,11 +56,16 @@ final class St80MTKView: MTKView {
 
     override func didMoveToWindow() {
         super.didMoveToWindow()
-        becomeFirstResponder()
 #if targetEnvironment(macCatalyst)
+        becomeFirstResponder()
         installCatalystInteractionsIfNeeded()
 #else
+        // On iOS the soft keyboard pops up when this view becomes
+        // first responder; the user explicitly opts in via the
+        // control strip's keyboard toggle. Hardware keyboard still
+        // works from the window's first responder chain.
         installIOSGestureRecognizersIfNeeded()
+        St80InputController.shared.mtkView = self
 #endif
     }
 
@@ -534,12 +539,14 @@ extension St80MTKView: UIKeyInput {
             default:
                 if code < 0x20 || code > 0x7E { continue }
             }
-            st80_post_key_down(code, 0)
+            let mods = St80InputController.shared.consumeActiveModifiers(0)
+            st80_post_key_down(code, mods)
         }
     }
 
     func deleteBackward() {
-        st80_post_key_down(8, 0)        // ASCII BS
+        let mods = St80InputController.shared.consumeActiveModifiers(0)
+        st80_post_key_down(8, mods)
     }
 }
 
