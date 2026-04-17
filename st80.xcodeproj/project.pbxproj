@@ -15,6 +15,8 @@
 		B10010 /* St80Image.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20014 /* St80Image.swift */; };
 		B10011 /* ImageManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20015 /* ImageManager.swift */; };
 		B10012 /* ImageLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20016 /* ImageLibraryView.swift */; };
+		B10013 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20017 /* AboutView.swift */; };
+		B10014 /* DocumentExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20018 /* DocumentExporter.swift */; };
 		B10006 /* Shaders.metal in Resources */ = {isa = PBXBuildFile; fileRef = B20006 /* Shaders.metal */; };
 		B10007 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B20007 /* Assets.xcassets */; };
 		B10008 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B20010 /* Metal.framework */; };
@@ -38,6 +40,8 @@
 		B20014 /* St80Image.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = St80Image.swift; sourceTree = "<group>"; };
 		B20015 /* ImageManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageManager.swift; sourceTree = "<group>"; };
 		B20016 /* ImageLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageLibraryView.swift; sourceTree = "<group>"; };
+		B20017 /* AboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
+		B20018 /* DocumentExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentExporter.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -83,6 +87,8 @@
 				B20014 /* St80Image.swift */,
 				B20015 /* ImageManager.swift */,
 				B20016 /* ImageLibraryView.swift */,
+				B20017 /* AboutView.swift */,
+				B20018 /* DocumentExporter.swift */,
 				B20006 /* Shaders.metal */,
 				B20007 /* Assets.xcassets */,
 				B20008 /* st80.entitlements */,
@@ -232,6 +238,8 @@
 				B10010 /* St80Image.swift in Sources */,
 				B10011 /* ImageManager.swift in Sources */,
 				B10012 /* ImageLibraryView.swift in Sources */,
+				B10013 /* AboutView.swift in Sources */,
+				B10014 /* DocumentExporter.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -306,7 +314,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Smalltalk-80";
+				INFOPLIST_KEY_CFBundleDisplayName = Smalltalk80;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -340,7 +348,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Smalltalk-80";
+				INFOPLIST_KEY_CFBundleDisplayName = Smalltalk80;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;

@@ -2,6 +2,79 @@
 
 User-visible changes. Most-recent build on top.
 
+## build 24 — 2026-04-17
+
+**Mac polish sweep** (todo-list items 1–10).
+
+- **Cursor sync on Catalyst.** Hide the system pointer via
+  `UIPointerInteraction.hidden()` and paint Smalltalk's 16×16 cursor
+  bitmap into a UIImageView overlay tracked by hover.
+- **Window resize / letterbox.** Both Mac targets now preserve the VM
+  display's aspect ratio under resize instead of stretching.
+  Hit-testing computes from the same content rect so clicks land
+  where the user sees the cursor.
+- **Clipboard bridge.** ⌘-V reads `UIPasteboard` and injects the text
+  as keystrokes. One-way bridge; copy-out left for future work.
+- **Mac menu bar.** "About Smalltalk80" now opens our About sheet via
+  `UIMenuBuilder` + a NotificationCenter post, and File → Export
+  Current Image… (⇧⌘E) opens a `UIDocumentPickerViewController` to
+  save the image outside the sandbox.
+- **`tools/st80_validate`.** New tool with `check` (walks OT, flags
+  dangling class references / bogus word lengths) and `shasum`
+  (per-OOP SHA-256 manifest, reproducible, useful for diffing two
+  snapshots). Sha256 ported from
+  `../validate_smalltalk_image` (MIT, same author).
+- **Docs.** `docs/testing.md` (existing tests + gaps),
+  `docs/performance.md` (benchmark candidates),
+  `docs/release.md` (signing / notarization runbook),
+  `docs/interpreter-audit.md` (baseline ~1.25 Mbc/s, ranked
+  Phase-5 proposals).
+
+## build 23 — 2026-04-17
+
+**Mac app rename, About box, yellow-button menu, quit.**
+
+- Renamed the user-visible Mac app to **Smalltalk80** (was
+  "Smalltalk-80 (Catalyst)" / "Smalltalk-80"). Bundle identifiers
+  and internal product names unchanged.
+- New About sheet in `app/apple-catalyst/AboutView.swift`, reachable
+  from an info button in the image-library top bar. Lists the GitHub
+  project (`avwohl/smalltalk80-2026`) and the three Smalltalk-80
+  reference repos (`dbanay`, `rochus-keller`, `iriyak`) as clickable
+  links.
+- **Right and middle clicks on Mac Catalyst.**
+  - Right-click (yellow menu): UIKit intercepts Catalyst right-click
+    as a system context-menu request before `touchesBegan` sees it,
+    so `St80MTKView` installs a `UIContextMenuInteraction` whose
+    delegate swallows the system menu and posts a yellow-button down
+    at the click location.
+  - Middle-click (blue / window-management menu): UIKit does not
+    deliver middle-button clicks to `touchesBegan` at all on Catalyst.
+    We bridge to AppKit at runtime via `NSClassFromString("NSEvent")`
+    + `class_getMethodImplementation` and install an
+    `addLocalMonitorForEventsMatchingMask:handler:` monitor for
+    `.otherMouseDown/Up`. The click location is read from
+    `UIHoverGestureRecognizer`'s most recent position (already in
+    view coords) rather than converting NSEvent coordinates.
+  - Ctrl+click / ⌥+click → yellow fallback for single-button
+    pointers. `⌘+click = blue` was removed.
+- **Sticky yellow/blue menus.** A real 3-button mouse drives a
+  Smalltalk menu with press-hold-drag-release; releasing at the click
+  location selects the item under the cursor — which on Catalyst
+  would always be item 1 because a mouse click has no drag phase.
+  The fix: we no longer send the button-up immediately. A new
+  `UIHoverGestureRecognizer` tracks cursor movement without any
+  button held, so the menu highlight follows the pointer, and the
+  user's next click (any button) fires the pending up at that
+  location, selecting the item or dismissing the menu. Same state
+  machine handles both yellow and blue menus.
+- **Smalltalk `quit` now terminates the app.** Previously
+  `primitiveQuit` (113) set the HAL's quit flag but nothing acted on
+  it, so picking "quit" from the yellow menu just stopped the VM
+  loop and left the app sitting there. New `st80_quit_requested()` in
+  Bridge.h is polled from the MetalRenderer each frame on both Mac
+  targets; Catalyst calls `exit(0)`, AppKit calls `NSApp.terminate`.
+
 ## build 22 — 2026-04-17
 
 **Image library + runtime download.** First-launch flow on the

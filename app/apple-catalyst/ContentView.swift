@@ -10,6 +10,8 @@ struct ContentView: View {
 
     @StateObject private var manager = ImageManager.shared
     @State private var launchedImagePath: String? = nil
+    @State private var showingAbout = false
+    @State private var showingExport = false
 
     var body: some View {
         Group {
@@ -22,6 +24,20 @@ struct ContentView: View {
                     manager.selectedImageID = image.id
                 }
             }
+        }
+        .sheet(isPresented: $showingAbout) { AboutView() }
+        .sheet(isPresented: $showingExport) {
+            if let path = launchedImagePath {
+                DocumentExporter(url: URL(fileURLWithPath: path)) {
+                    showingExport = false
+                }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .st80ShowAbout)) { _ in
+            showingAbout = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .st80ExportImage)) { _ in
+            if launchedImagePath != nil { showingExport = true }
         }
     }
 }

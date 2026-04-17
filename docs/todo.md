@@ -50,3 +50,10 @@ Unordered. Pick anything.
    macroBenchmarks from Squeak ported to the Blue Book image,
    BitBlt throughput — and wire them so we can compare interpreter
    vs JIT once that lands.
+
+10. **Port `validate_smalltalk_image` functionality.** Sibling project
+    `../validate_smalltalk_image` has image-checking utilities. Port at
+    least the **check** and **diff/sha** commands into a tool in this
+    repo (likely `tools/st80_validate` alongside `st80_run` and
+    `st80_probe`). Useful for sanity-checking user-provided images and
+    comparing snapshots across runs.

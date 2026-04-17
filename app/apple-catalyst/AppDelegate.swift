@@ -39,6 +39,41 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         st80_stop()
         st80_shutdown()
     }
+
+    // Replace the stock "About Smalltalk80" menu item with one that
+    // presents our SwiftUI AboutView and add a File → Export Current
+    // Image menu command for Save-As-style image export.
+    override func buildMenu(with builder: UIMenuBuilder) {
+        super.buildMenu(with: builder)
+#if targetEnvironment(macCatalyst)
+        let about = UICommand(
+            title: "About Smalltalk80",
+            action: #selector(showAboutFromMenu))
+        builder.replaceChildren(ofMenu: .about) { _ in [about] }
+
+        let export = UIKeyCommand(
+            title: "Export Current Image…",
+            action: #selector(exportImageFromMenu),
+            input: "e",
+            modifierFlags: [.command, .shift])
+        let exportMenu = UIMenu(title: "", options: .displayInline,
+                                children: [export])
+        builder.insertChild(exportMenu, atStartOfMenu: .file)
+#endif
+    }
+
+    @objc func showAboutFromMenu() {
+        NotificationCenter.default.post(name: .st80ShowAbout, object: nil)
+    }
+
+    @objc func exportImageFromMenu() {
+        NotificationCenter.default.post(name: .st80ExportImage, object: nil)
+    }
+}
+
+extension Notification.Name {
+    static let st80ShowAbout    = Notification.Name("st80ShowAbout")
+    static let st80ExportImage  = Notification.Name("st80ExportImage")
 }
 
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
@@ -57,7 +92,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         if let titlebar = windowScene.titlebar {
             titlebar.titleVisibility = .visible
         }
-        scene.title = "Smalltalk-80"
+        scene.title = "Smalltalk80"
 #endif
 
         let contentView = ContentView()

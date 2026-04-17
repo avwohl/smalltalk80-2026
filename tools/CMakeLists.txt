@@ -17,3 +17,10 @@ target_include_directories(st80_run PRIVATE
     ${CMAKE_SOURCE_DIR}/src/platform/posix
     ${CMAKE_SOURCE_DIR}/src/platform/headless
 )
+
+add_executable(st80_validate st80_validate.cpp Sha256.cpp)
+target_link_libraries(st80_validate PRIVATE st80core)
+target_include_directories(st80_validate PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/platform/posix
+    ${CMAKE_SOURCE_DIR}/src/platform/headless
+)

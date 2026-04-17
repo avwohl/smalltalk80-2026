@@ -212,6 +212,10 @@ extern "C" void st80_shutdown(void) {
     g_runtime = nullptr;
 }
 
+extern "C" int st80_quit_requested(void) {
+    return g_runtime && g_runtime->hal.quitRequested() ? 1 : 0;
+}
+
 // ============================================================================
 // Display
 // ============================================================================

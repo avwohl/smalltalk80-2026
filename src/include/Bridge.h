@@ -48,6 +48,11 @@ void st80_stop(void);
 /* Tear down the core. Invalidates all pointers previously returned. */
 void st80_shutdown(void);
 
+/* Non-zero if the image has invoked primitiveQuit (113). The frontend
+ * should poll this after each `st80_run` call and terminate the host
+ * app when it transitions to true. */
+int st80_quit_requested(void);
+
 /* =========================================================================
  * Display
  *

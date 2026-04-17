@@ -68,7 +68,9 @@ swiftc \
     "$SCRIPT_DIR/St80MTKView.swift" \
     "$SCRIPT_DIR/St80Image.swift" \
     "$SCRIPT_DIR/ImageManager.swift" \
-    "$SCRIPT_DIR/ImageLibraryView.swift"
+    "$SCRIPT_DIR/ImageLibraryView.swift" \
+    "$SCRIPT_DIR/AboutView.swift" \
+    "$SCRIPT_DIR/DocumentExporter.swift"
 
 touch "$APP_DIR"
 
