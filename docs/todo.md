@@ -1,59 +1,80 @@
-# Mac Smalltalk80 — Remaining Work (excl. JIT)
+# Mac Smalltalk80 — Remaining Work (excl. JIT & iOS)
 
-Unordered. Pick anything.
+Rewritten 2026-04-17 after the polish sweep. Items 1–5 and 10–12 from
+the first pass shipped; what's left is below.
 
-1. **Cursor sync on Catalyst.** `AppleHal.cpp` tracks Smalltalk's
-   `set_cursor_image` but the Catalyst Swift side never reads it, so
-   the system pointer stays as the arrow even when the image changes
-   it (text I-beam in editors, etc.). The pure AppKit target already
-   does this in `St80MTKView` — port the same path to
-   `app/apple-catalyst/St80MTKView.swift`.
+## Code work that would most help users
 
-2. **Window resize.** `MetalRenderer.drawableSizeWillChange` is
-   empty. Resizing the window stretches the 1-bit display instead of
-   asking the VM for a new display size. Wire a resize path, or at
-   least lock the aspect ratio.
+1. **Save-on-close prompt.** Today a plain Mac Cmd-Q or window-close
+   kills the app without offering to snapshot. Intercept it, check
+   whether the image has unsaved changes (Smalltalk's `Smalltalk
+   isDirty` or a primitive we add), and ask the user before exit.
+   Blue Book convention is "quit = discard", but that's a footgun on
+   macOS; a polite "save first?" is expected.
 
-3. **System clipboard bridge.** Smalltalk's cut/copy/paste is
-   internal only. Typing in the Mac app can't paste from a browser,
-   and text copied inside Smalltalk doesn't appear on the Mac
-   clipboard. Bridge via `UIPasteboard` on Catalyst and the relevant
-   primitives on the core side.
+2. **File associations.** Register `VirtualImage` / `.image` files so
+   double-clicking one in Finder launches Smalltalk80 and loads it.
+   Info.plist `UTImportedTypeDeclarations` + `CFBundleDocumentTypes`.
+   Wire `application(_:open:)` to route the URL through
+   `ImageManager.importImage` (code already exists).
 
-4. **macOS menu bar.** No File/Edit/View menus and no "About
-   Smalltalk80" menu item — the About sheet only shows from the
-   in-app info button. Hook `UIMenuBuilder` on Catalyst to publish a
-   standard menu bar and wire the About menu item to present
-   `AboutView`.
+3. **State restoration.** Remember which image was last launched and
+   resume automatically on next start, skipping the library screen.
+   NSUserDefaults + `launchedImagePath`.
 
-5. **Snapshot "Save As".** Image snapshot only writes to the
-   sandboxed Documents dir. Add a user-facing "save image to disk"
-   flow using `UIDocumentPickerViewController` so users can export
-   snapshots outside the sandbox.
+4. **Verify cursor overlay in all states.** The overlay now tracks
+   hover AND click-drag, but needs interactive verification:
+   - text-selection drag shows the chevron following the cursor
+   - scrollbar regions show three distinct shapes
+   - menu/desktop shows the default Smalltalk arrow, not the macOS
+     system pointer
+   All three worked in first tests with caveats. Any remaining "no
+   cursor visible" moments probably indicate the image has set an
+   unusual form we render as blank.
 
-6. **Signing / notarization / release packaging.** Phase-5 item.
-   Needed for distribution outside Xcode. Configure Developer ID
-   signing, notarization, and a DMG build in `scripts/`.
+## Phase-5 interpreter audit — implement the proposals
 
-7. **Phase-5 interpreter audit.** Cache OOP→address on the hot
-   path; add monomorphic inline-cache at send sites. Sets up the
-   JIT tier-up seams while also making the interpreter faster.
+`docs/interpreter-audit.md` spells out the ranked plan. Highest-value
+items:
 
-8. **Find / document correctness tests for the VM + image.** We
-   pass trace2/trace3 byte-for-byte, but there's no checklist of
-   what else to run. Inventory: dbanay's test vectors, BitBlt unit
-   tests, primitive-table coverage, any in-image Smalltalk test
-   suites we should be exercising.
+5. **Measure method-cache hit rate.** ~20 lines. Hit-rate counter in
+   the send path, dumped at `st80_run` exit. Informs whether to
+   invest in a larger cache vs PIC.
 
-9. **Find / document performance tests.** No established benchmark
-   suite yet. Identify candidates — Blue Book tinyBenchmarks,
-   macroBenchmarks from Squeak ported to the Blue Book image,
-   BitBlt throughput — and wire them so we can compare interpreter
-   vs JIT once that lands.
+6. **Cache the current method's byte pointer.** Estimated 1.5–2×
+   interpreter speedup. `fetchByte` currently re-walks the Object
+   Table on every bytecode. Biggest single win short of JIT.
 
-10. **Port `validate_smalltalk_image` functionality.** Sibling project
-    `../validate_smalltalk_image` has image-checking utilities. Port at
-    least the **check** and **diff/sha** commands into a tool in this
-    repo (likely `tools/st80_validate` alongside `st80_run` and
-    `st80_probe`). Useful for sanity-checking user-provided images and
-    comparing snapshots across runs.
+7. **SmallInteger specialization for arithmetic bytecodes** (176–207).
+   1.2–1.5× on arithmetic-heavy code. Same safety net: `trace2_check`
+   still passes.
+
+## Release-machinery items
+
+8. **Actually sign and notarize.** Runbook in `docs/release.md`.
+   Requires the user's Developer ID certificate and app-specific
+   password; can't be done in isolation. Once creds are present,
+   a `scripts/release.sh` that runs the sequence is maybe 50 lines.
+
+## Testing & benchmarks — wire what we documented
+
+9. **Wire `trace3` regression check** alongside `trace2_check.sh`.
+   Trace3 exercises message-send boundaries that trace2 doesn't.
+
+10. **Add `tinyBenchmarks` driver** in `tools/`. Boots the image,
+    drives `BenchmarksReport run`, captures the transcript, parses
+    the numeric pair. Gives us the single headline number interp vs
+    JIT will compare on.
+
+11. **Add `st80_validate check` to CTest.** Tool already written
+    (item 10 in the prior pass); just needs a CTest target that
+    runs it on the Xerox image after boot.
+
+## Things explicitly parked
+
+- iOS target (Phase 3).
+- JIT (Phase 6).
+- Windows / Linux (Phase 4).
+- Copy-out clipboard (requires HAL primitive + image mod).
+- VoiceOver / accessibility audit (bitmap content has no meaningful
+  semantics to expose).
