@@ -12,8 +12,11 @@ struct ImageLibraryView: View {
     @ObservedObject var manager: ImageManager
     let onLaunch: (St80Image) -> Void
 
+    @State private var showingAbout = false
+
     var body: some View {
         VStack(spacing: 24) {
+            topBar
             header
 
             if manager.images.isEmpty {
@@ -38,6 +41,20 @@ struct ImageLibraryView: View {
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear { manager.load() }
+        .sheet(isPresented: $showingAbout) { AboutView() }
+    }
+
+    private var topBar: some View {
+        HStack {
+            Spacer()
+            Button {
+                showingAbout = true
+            } label: {
+                Image(systemName: "info.circle")
+                    .font(.title2)
+            }
+            .accessibilityLabel("About")
+        }
     }
 
     private var header: some View {

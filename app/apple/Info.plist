@@ -5,7 +5,7 @@
     <key>CFBundleName</key>
     <string>St80</string>
     <key>CFBundleDisplayName</key>
-    <string>Smalltalk-80</string>
+    <string>Smalltalk80</string>
     <key>CFBundleIdentifier</key>
     <string>com.awohl.st80</string>
     <key>CFBundleVersion</key>

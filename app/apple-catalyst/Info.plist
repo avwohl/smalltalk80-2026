@@ -5,7 +5,7 @@
     <key>CFBundleName</key>
     <string>St80Catalyst</string>
     <key>CFBundleDisplayName</key>
-    <string>Smalltalk-80 (Catalyst)</string>
+    <string>Smalltalk80</string>
     <key>CFBundleIdentifier</key>
     <string>com.awohl.st80.catalyst</string>
     <key>CFBundleVersion</key>

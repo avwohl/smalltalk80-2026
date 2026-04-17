@@ -43,7 +43,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         let imageName = (CommandLine.arguments.dropFirst().first { !$0.hasPrefix("-") })
                        .map { ($0 as NSString).lastPathComponent } ?? ""
-        window.title = imageName.isEmpty ? "Smalltalk-80" : "Smalltalk-80 — \(imageName)"
+        window.title = imageName.isEmpty ? "Smalltalk80" : "Smalltalk80 — \(imageName)"
         window.contentView = NSHostingView(rootView: contentView)
         window.center()
         window.setFrameAutosaveName("St80Window")
