@@ -119,9 +119,20 @@ set(ST80_APPX_DIR "${CMAKE_BINARY_DIR}/st80-${PROJECT_VERSION}-appx")
 # Substitute version into AppxManifest.xml. The template lives in
 # packaging/windows/; variables listed in @ST80_* are expanded here.
 set(ST80_APPX_VERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}.0")
-set(ST80_APPX_PUBLISHER "CN=Aaron Wohl")
+# Publisher is the Store-assigned Publisher ID (a GUID CN), NOT the
+# human "CN=Aaron Wohl" used for side-loading. Partner Center
+# rejects uploads whose Publisher doesn't match the reservation; the
+# package-family-name hash (e.g. _pyqcdeggzw67m) is derived from
+# Publisher + Name, so using the wrong Publisher also breaks the
+# family check. Get this value from Partner Center → Product
+# Identity → "Package/Identity/Publisher".
+set(ST80_APPX_PUBLISHER "CN=724C9014-DD22-420E-9BB4-F2740D082EB0")
 set(ST80_APPX_PACKAGE_NAME "AaronWohl.Smalltalk80")
-set(ST80_APPX_DISPLAY_NAME "Smalltalk-80")
+# DisplayName must exactly match a reserved name in Partner Center
+# ("Manage app names"). We reserved "Smalltalk80" (no hyphen).
+# The rest of the product's user-facing branding still says
+# "Smalltalk-80"; only this MSIX manifest field has to match.
+set(ST80_APPX_DISPLAY_NAME "Smalltalk80")
 set(ST80_APPX_PUBLISHER_DISPLAY_NAME "Aaron Wohl")
 # Prefer CMAKE_GENERATOR_PLATFORM (the Visual Studio generator's -A
 # arg). CMAKE_SYSTEM_PROCESSOR reflects the HOST, so on a cross

@@ -8,10 +8,11 @@
   The Store enforces that:
 
     * Identity/@Name and Identity/@Publisher are the exact strings
-      from Partner Center (Publisher Display Name + Package name).
-      For unsigned side-loading builds, "CN=Aaron Wohl" is fine;
-      Partner Center will hand you the real Publisher string once
-      your reservation is approved.
+      from Partner Center (App identity → Package/Identity).
+      These are hard-coded in cmake/WindowsPackaging.cmake. The
+      Publisher is a GUID CN assigned by the Store (NOT the
+      human-readable "CN=Aaron Wohl"); Properties/DisplayName must
+      match a name reserved under "Manage app names".
 
     * Identity/@Version is a 4-part Major.Minor.Build.Revision
       where Revision is reserved for the Store (must be 0 on
