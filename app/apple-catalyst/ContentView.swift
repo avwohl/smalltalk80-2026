@@ -1,36 +1,56 @@
 // st80-2026 — ContentView.swift (Catalyst / iOS)
 // Copyright (c) 2026 Aaron Wohl. MIT License.
 //
-// Top-level screen switcher: show the image library until the user
-// launches an image, then hand over to the Metal-backed VM view.
+// Top-level screen switcher:
+//
+//   1. AutoLaunchSplashView — shown briefly if the user has starred an
+//      image and the catalog still contains it. 3-second countdown
+//      with a "Show Library" escape hatch.
+//   2. ImageLibraryView    — the picker, when no image is starred or
+//      the user cancelled the splash.
+//   3. MetalView           — once the user launches an image.
 
 import SwiftUI
 
+private enum Screen {
+    case splash(St80Image)
+    case library
+    case running(String)
+}
+
 struct ContentView: View {
 
-    // Remember the last-launched image path so the app can skip the
-    // library view on next launch. We store a path rather than a UUID
-    // so that even if the catalog was rewritten, the app still
-    // finds its last image as long as the file exists on disk.
-    private static let lastImagePathKey = "st80.lastImagePath"
-
     @StateObject private var manager = ImageManager.shared
-    @State private var launchedImagePath: String? =
-        UserDefaults.standard.string(forKey: lastImagePathKey)
-            .flatMap { FileManager.default.fileExists(atPath: $0) ? $0 : nil }
+    @State private var screen: Screen = .library
+    @State private var didApplyAutoLaunch = false
     @State private var showingAbout = false
     @State private var showingExport = false
 
+    @AppStorage("st80.autoLaunchImageID") private var autoLaunchImageID: String?
+
     var body: some View {
         Group {
-            if let path = launchedImagePath {
-                // Don't extend under the Mac title bar — clicks on the
-                // top strip were being interpreted as "drag the window"
-                // before reaching the MTKView. Still extend to the
-                // other edges for maximum VM canvas.
+            switch screen {
+            case .splash(let image):
+                AutoLaunchSplashView(
+                    imageName: image.name,
+                    onLaunch: {
+                        launch(image)
+                    },
+                    onCancel: {
+                        screen = .library
+                    })
+
+            case .library:
+                ImageLibraryView(manager: manager) { image in
+                    launch(image)
+                }
+
+            case .running(let path):
                 #if targetEnvironment(macCatalyst)
                 MetalView(imagePath: path)
-                    .ignoresSafeArea(.container, edges: [.leading, .trailing, .bottom])
+                    .ignoresSafeArea(.container,
+                                     edges: [.leading, .trailing, .bottom])
                 #else
                 HStack(spacing: 0) {
                     ControlStripView()
@@ -38,18 +58,12 @@ struct ContentView: View {
                 }
                 .ignoresSafeArea(.container, edges: .bottom)
                 #endif
-            } else {
-                ImageLibraryView(manager: manager) { image in
-                    launchedImagePath = image.imagePath
-                    manager.selectedImageID = image.id
-                    UserDefaults.standard.set(image.imagePath,
-                                              forKey: Self.lastImagePathKey)
-                }
             }
         }
+        .onAppear { applyAutoLaunchOnce() }
         .sheet(isPresented: $showingAbout) { AboutView() }
         .sheet(isPresented: $showingExport) {
-            if let path = launchedImagePath {
+            if case .running(let path) = screen {
                 DocumentExporter(url: URL(fileURLWithPath: path)) {
                     showingExport = false
                 }
@@ -59,7 +73,26 @@ struct ContentView: View {
             showingAbout = true
         }
         .onReceive(NotificationCenter.default.publisher(for: .st80ExportImage)) { _ in
-            if launchedImagePath != nil { showingExport = true }
+            if case .running = screen { showingExport = true }
         }
+    }
+
+    private func applyAutoLaunchOnce() {
+        guard !didApplyAutoLaunch else { return }
+        didApplyAutoLaunch = true
+        manager.load()
+        guard let id = autoLaunchImageID,
+              let uuid = UUID(uuidString: id),
+              let image = manager.images.first(where: { $0.id == uuid }),
+              image.exists else {
+            screen = .library
+            return
+        }
+        screen = .splash(image)
+    }
+
+    private func launch(_ image: St80Image) {
+        manager.markLaunched(image)
+        screen = .running(image.imagePath)
     }
 }

@@ -2,6 +2,51 @@
 
 User-visible changes. Most-recent build on top.
 
+## build 31 — 2026-04-18
+
+**Catalyst launcher: Pharo-Launcher-style picker.** The iOS / Mac
+Catalyst image picker is rewritten to match the launcher in the
+companion `iospharo` project (https://github.com/avwohl/iospharo).
+Same behaviour, ported to st80 conventions:
+
+  - Sortable column headers — Name, Source, Size, Last Modified
+    (click to toggle direction).
+  - Filter / search box at the top with a clear-X button.
+  - Detail panel under the table — image filename, location, source
+    label, total size on disk, modification date, added date, last
+    launched date, plus an action strip (Launch / Rename / Share /
+    Show in Files / Auto-Launch / Delete).
+  - Per-row context menu (long-press) with the same actions plus
+    Duplicate.
+  - Swipe-to-delete on each row, with a confirmation alert that
+    spells out exactly what will be removed.
+  - Star / Auto-Launch — pick an image to skip the picker on next
+    launch. Persisted in `UserDefaults` under
+    `st80.autoLaunchImageID`.
+  - Auto-launch splash — when an image is starred, the app shows a
+    3-second countdown with a "Show Library" button before opening
+    the VM, so a damaged image can't lock you out.
+  - Download dialog (`NewImageView`) — picks a built-in template
+    *or* downloads from a custom URL. Downloads now have a cancel
+    button while in flight.
+  - Settings sheet — version, links to GitHub / Issues / Changes,
+    and a navigable Acknowledgements view that mirrors
+    `THIRD_PARTY_LICENSES`.
+  - Project-info bar across the top of the library showing
+    version + GitHub / Changes / Bug links.
+  - Error banner overlay at the bottom — tap to dismiss.
+
+Library catalog backwards compatibility: existing
+`Documents/image-library.json` files keep loading. New optional
+fields (`lastLaunchedAt`, `imageSizeBytes`, `imageLabel`) are
+filled in on first save. The catalog is also rescanned on load so
+images dropped into `Documents/Images/<slug>/` by hand show up
+automatically.
+
+The `Export-as-App` feature from iospharo is intentionally left out
+— it's a Pharo-specific build-an-Xcode-project pipeline that
+doesn't translate to st80's Smalltalk-80 image format.
+
 ## build 30 — 2026-04-18
 
 **Windows packaging: cross-arch `.msixbundle` for Store release.**

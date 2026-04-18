@@ -69,6 +69,12 @@ swiftc \
     "$SCRIPT_DIR/St80Image.swift" \
     "$SCRIPT_DIR/ImageManager.swift" \
     "$SCRIPT_DIR/ImageLibraryView.swift" \
+    "$SCRIPT_DIR/ImageRow.swift" \
+    "$SCRIPT_DIR/DownloadProgressRow.swift" \
+    "$SCRIPT_DIR/NewImageView.swift" \
+    "$SCRIPT_DIR/SettingsView.swift" \
+    "$SCRIPT_DIR/AcknowledgementsView.swift" \
+    "$SCRIPT_DIR/AutoLaunchSplashView.swift" \
     "$SCRIPT_DIR/AboutView.swift" \
     "$SCRIPT_DIR/DocumentExporter.swift" \
     "$SCRIPT_DIR/St80InputController.swift" \

@@ -23,6 +23,12 @@
 		B10014 /* DocumentExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20018 /* DocumentExporter.swift */; };
 		B10015 /* St80InputController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20019 /* St80InputController.swift */; };
 		B10016 /* ControlStripView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20020 /* ControlStripView.swift */; };
+		B10017 /* ImageRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20021 /* ImageRow.swift */; };
+		B10018 /* DownloadProgressRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20022 /* DownloadProgressRow.swift */; };
+		B10019 /* NewImageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20023 /* NewImageView.swift */; };
+		B10020 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20024 /* SettingsView.swift */; };
+		B10021 /* AcknowledgementsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20025 /* AcknowledgementsView.swift */; };
+		B10022 /* AutoLaunchSplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20026 /* AutoLaunchSplashView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -46,6 +52,12 @@
 		B20018 /* DocumentExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentExporter.swift; sourceTree = "<group>"; };
 		B20019 /* St80InputController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = St80InputController.swift; sourceTree = "<group>"; };
 		B20020 /* ControlStripView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlStripView.swift; sourceTree = "<group>"; };
+		B20021 /* ImageRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageRow.swift; sourceTree = "<group>"; };
+		B20022 /* DownloadProgressRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadProgressRow.swift; sourceTree = "<group>"; };
+		B20023 /* NewImageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewImageView.swift; sourceTree = "<group>"; };
+		B20024 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		B20025 /* AcknowledgementsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcknowledgementsView.swift; sourceTree = "<group>"; };
+		B20026 /* AutoLaunchSplashView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoLaunchSplashView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -91,6 +103,12 @@
 				B20014 /* St80Image.swift */,
 				B20015 /* ImageManager.swift */,
 				B20016 /* ImageLibraryView.swift */,
+				B20021 /* ImageRow.swift */,
+				B20022 /* DownloadProgressRow.swift */,
+				B20023 /* NewImageView.swift */,
+				B20024 /* SettingsView.swift */,
+				B20025 /* AcknowledgementsView.swift */,
+				B20026 /* AutoLaunchSplashView.swift */,
 				B20017 /* AboutView.swift */,
 				B20018 /* DocumentExporter.swift */,
 				B20019 /* St80InputController.swift */,
@@ -244,6 +262,12 @@
 				B10010 /* St80Image.swift in Sources */,
 				B10011 /* ImageManager.swift in Sources */,
 				B10012 /* ImageLibraryView.swift in Sources */,
+				B10017 /* ImageRow.swift in Sources */,
+				B10018 /* DownloadProgressRow.swift in Sources */,
+				B10019 /* NewImageView.swift in Sources */,
+				B10020 /* SettingsView.swift in Sources */,
+				B10021 /* AcknowledgementsView.swift in Sources */,
+				B10022 /* AutoLaunchSplashView.swift in Sources */,
 				B10013 /* AboutView.swift in Sources */,
 				B10014 /* DocumentExporter.swift in Sources */,
 				B10015 /* St80InputController.swift in Sources */,
