@@ -2,8 +2,9 @@
 // Copyright (c) 2026 Aaron Wohl. MIT License.
 //
 // Thread-safe FIFO of Blue Book input words. UI thread pushes 16-bit
-// encoded events in, VM thread pops them out via
-// IHal::next_input_word.
+// encoded events in; VM thread pops them out via
+// IHal::next_input_word. Platform-neutral — shared by every host HAL
+// under src/platform/.
 
 #pragma once
 

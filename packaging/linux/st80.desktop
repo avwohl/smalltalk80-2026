@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Smalltalk-80
+GenericName=Smalltalk-80 Virtual Machine
+Comment=1983 Xerox Blue Book Smalltalk-80
+Exec=st80-linux %f
+Terminal=false
+Categories=Development;IDE;
+Keywords=smalltalk;vm;xerox;bluebook;
+StartupNotify=true

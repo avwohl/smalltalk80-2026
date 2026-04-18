@@ -2,6 +2,87 @@
 
 User-visible changes. Most-recent build on top.
 
+## build 25 — 2026-04-17
+
+**Linux port (x86_64) — Phase 4 kickoff.**
+
+First non-Apple target. The Xerox 1983 desktop renders in an SDL2
+window on Ubuntu 25.10 / Wayland; `.deb` and `.rpm` packages build
+via CPack. No `#ifdef` branching in the platform layer — each host
+gets its own files behind `IHal` and `Bridge.h`.
+
+New files:
+
+  - `src/platform/common/EventQueue.hpp` — host-neutral FIFO of
+    16-bit Blue Book input words (moved up from
+    `src/platform/apple/` so Linux can include it unchanged).
+  - `src/platform/linux/LinuxHal.{hpp,cpp}` — IHal impl. RGBA8
+    staging buffer + dirty rect + `signal_at` scheduling +
+    EventQueue, mirroring `AppleHal`. No GUI deps inside the HAL.
+    Wall-clock Smalltalk epoch (1901-01-01) from
+    `chrono::system_clock`.
+  - `src/platform/linux/LinuxBridge.cpp` — implements `Bridge.h`
+    on top of `LinuxHal`, `Interpreter`, `PosixFileSystem`.
+    Structurally identical to `AppleBridge.cpp`.
+  - `src/platform/linux/CMakeLists.txt` — builds
+    `libst80_linux.a`; wired in via `if(UNIX AND NOT APPLE)` from
+    the top-level `CMakeLists.txt`.
+  - `app/linux/st80_linux_main.cpp` + `CMakeLists.txt` — SDL2
+    frontend. `SDL_Init(VIDEO|EVENTS)`, window at the VM display
+    size, `SDL_PIXELFORMAT_ARGB8888` streaming texture, dirty-rect
+    updates via `SDL_UpdateTexture`. Mouse buttons map to
+    red/yellow/blue; Ctrl+click = blue, Alt+click = yellow for
+    single-button hosts. `SDL_TEXTINPUT` feeds 7-bit ASCII
+    keystrokes into `st80_post_key_down`. `--no-window` flag
+    drives a headless smoke-test loop.
+  - `cmake/LinuxPackaging.cmake` + `packaging/linux/st80.desktop`
+    — CPack config producing `.deb` and `.rpm`. SHLIBDEPS picks
+    up the correct runtime deps (`libsdl2-2.0-0`, libc, libgcc_s,
+    libstdc++); RPM additionally requires `SDL2`.
+  - `src/platform/posix/PosixFileSystem.hpp` — Windows `_WIN32`
+    branches removed. The file is now pure POSIX and is shared
+    between the Apple and Linux slices. A future Windows port
+    will add `src/platform/win32/WindowsFileSystem.hpp` next to
+    it rather than maintaining mixed branches in one file.
+
+Verification on a stock Ubuntu 25.10 host (Wayland + Xwayland):
+
+  - `cmake --build build-linux` — 19/19 targets compile clean,
+    zero warnings.
+  - `ctest` — `core_smoke_test` green; `trace2_check` green
+    byte-for-byte on 499-bytecode Xerox reference.
+  - `st80_probe` vs raw big-endian `VirtualImage` →
+    `oopsLeft = 14375, coreLeft = 723822 words` (identical to
+    the Mac numbers, so the endian-aware loader ports clean).
+  - `st80-linux` windowed: screenshot shows System Transcript
+    "Snapshot at: (31 May 1983 10:37:52 am)", System Workspace
+    Xerox banner, class-category browser — same output as
+    Catalyst.
+  - `.deb` 85 K, `.rpm` 91 K under `build-linux/`. Both contain
+    `/usr/bin/st80-linux`, `/usr/share/applications/st80.desktop`,
+    and `/usr/share/doc/st80/{LICENSE,README.md,THIRD_PARTY_LICENSES}`.
+  - Install / uninstall of the `.deb` via `dpkg -i` then
+    `dpkg -r` round-trips clean; installed binary runs the
+    reference image in headless mode.
+
+Build commands:
+
+    cmake -S . -B build-linux -G Ninja
+    cmake --build build-linux
+    cd build-linux && cpack -G DEB && cpack -G RPM
+
+Not yet wired on Linux (intentional, Phase 5 polish):
+
+  - Cursor image rendering (SDL has `SDL_CreateCursor` — one
+    afternoon of glue).
+  - Sandboxed image library / first-launch download
+    (the Catalyst build has this via `ImageManager.swift`).
+  - Sources/changes file paths (image is read-only today).
+
+ARM Linux is the next slice; the tree is ready for it — only the
+`dpkg --print-architecture` / `uname -m` detections in
+`cmake/LinuxPackaging.cmake` need to run on the aarch64 host.
+
 ## build 24 — 2026-04-17
 
 **Mac polish sweep** (todo-list items 1–10).

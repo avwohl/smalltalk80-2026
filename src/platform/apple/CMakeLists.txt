@@ -18,6 +18,7 @@ target_include_directories(st80_apple PUBLIC
     ${CMAKE_SOURCE_DIR}/src/include
     ${CMAKE_SOURCE_DIR}/src/core
     ${CMAKE_SOURCE_DIR}/src/platform/posix
+    ${CMAKE_SOURCE_DIR}/src/platform/common
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 

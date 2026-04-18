@@ -14,9 +14,14 @@ build-test/
 build-maccatalyst/
 build-catalyst/
 build-catalyst
+build-linux/
 build-xcframework/
 build-xcodeproj/
 cmake-build-*/
+
+# Package outputs
+*.deb
+*.rpm
 
 # Xcode
 DerivedData/

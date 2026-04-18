@@ -118,10 +118,13 @@ for yellow, two-finger-tap for blue). On-screen keyboard. Snapshot path
 **Exit:** boots on iPad; a method can be edited and saved.
 
 ### Phase 4 — Windows + Linux (weeks 7–8)
-Direct2D or plain GDI on Windows. Xlib/Wayland (or optional SDL2 now
-that the core is clean) on Linux.
+Direct2D or plain GDI on Windows. SDL2 on Linux.
+**Linux landed 2026-04-17 (build 25).** `st80-linux` renders the
+Xerox desktop under SDL2 on Ubuntu 25.10; `.deb` and `.rpm` packages
+ship via CPack. No `#ifdef` in the platform layer — each host gets
+its own files behind `IHal` and `Bridge.h`. ARM Linux next; Windows
+after.
 **Exit:** doIt works on both; no Apple regressions.
-**Open question:** order — Windows first, Linux first, or parallel?
 
 ### Phase 5 — Polish & release gate (week 9)
 Interpreter performance audit — cache OOP→address, inline-cache send
@@ -158,7 +161,8 @@ regressions vs interpreter on a recorded trace.
 
 ## Open questions
 
-- Phase 4 order (Windows vs Linux first, or parallel).
+- (resolved 2026-04-17) Phase 4 order: Linux first (x86_64 Ubuntu
+  host available). Windows next.
 
 ## Prerequisites before Phase 1
 

@@ -1,7 +1,11 @@
 # st80-2026 — Smalltalk-80 Blue Book implementation.
 
 cmake_minimum_required(VERSION 3.20)
-project(st80-2026 LANGUAGES CXX)
+project(st80-2026
+    VERSION 0.1.0
+    DESCRIPTION "Smalltalk-80 Blue Book (1983) implementation"
+    HOMEPAGE_URL "https://github.com/avwohl/st80-2026"
+    LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -41,5 +45,18 @@ add_subdirectory(tools)
 if(APPLE)
     add_subdirectory(src/platform/apple)
 endif()
+
+# Linux: SDL2-backed frontend + LinuxHal/Bridge built on every
+# non-Apple Unix host (Ubuntu/Debian/Fedora/etc.).
+if(UNIX AND NOT APPLE)
+    add_subdirectory(src/platform/linux)
+    add_subdirectory(app/linux)
+endif()
 # Phase 4: add_subdirectory(src/platform/win32)
-# Phase 4: add_subdirectory(src/platform/linux)
+
+# --- packaging ------------------------------------------------------
+# CPack only runs on Linux for now: Mac uses xcodebuild → App Store,
+# and Windows packaging lands with the Phase 4 Win32 slice.
+if(UNIX AND NOT APPLE)
+    include(cmake/LinuxPackaging.cmake)
+endif()

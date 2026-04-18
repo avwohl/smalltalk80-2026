@@ -5,10 +5,12 @@ image for modern systems. Target order: macOS / Mac Catalyst, iOS,
 Windows, Linux. Interpreter first, JIT afterwards on every target
 except iOS.
 
-**Status**: **Phase 2**, running on native macOS and Mac Catalyst.
-The Xerox v2 image boots to its desktop, clicks open context
-menus, cursors render, keyboard events deliver. Phase 1 gate
-(Xerox `trace2` byte-for-byte) stays green.
+**Status**: **Phase 4 (Linux)** and **Phase 2 (Apple)** — running
+on native macOS, Mac Catalyst, and x86_64 Linux (SDL2 desktop).
+The Xerox v2 image boots to its desktop on all three; clicks open
+context menus, cursors render, keyboard events deliver. `.deb`
+and `.rpm` packages build on Linux via CPack. Phase 1 gate
+(Xerox `trace2` byte-for-byte) stays green everywhere.
 
 See [`docs/plan.md`](docs/plan.md) for the roadmap,
 [`docs/architecture.md`](docs/architecture.md) for how the code is
@@ -105,6 +107,55 @@ whenever a VM source file is newer than the xcframework's
 `Info.plist`, so editing C++ core code and hitting build in Xcode
 Just Works.
 
+## Quickstart (Linux, x86_64)
+
+Tested on Ubuntu 25.10. Other Debian / Fedora derivatives should
+work; the `.deb` and `.rpm` packages target them directly.
+
+Prerequisites:
+
+    sudo apt-get install build-essential cmake ninja-build \
+                         pkg-config libsdl2-dev
+
+For packaging, also:
+
+    sudo apt-get install dpkg-dev rpm
+
+Build and smoke-test:
+
+    cmake -S . -B build-linux -G Ninja
+    cmake --build build-linux
+    (cd build-linux && ctest --output-on-failure)
+
+Fetch the Xerox image once (same source as the macOS path):
+
+    mkdir -p reference/xerox-image
+    curl -sSLo reference/xerox-image/VirtualImage \
+        https://github.com/avwohl/st80-images/releases/download/xerox-v2/VirtualImage
+
+Run the desktop:
+
+    ./build-linux/app/linux/st80-linux reference/xerox-image/VirtualImage
+
+Three-button mouse mapping: plain click = red (select); right-click
+or Alt+click = yellow (text menu); middle-click or Ctrl+click =
+blue (window menu). `--no-window` runs a headless smoke pass.
+
+Build installable packages:
+
+    cd build-linux
+    cpack -G DEB    # → st80_0.1.0_amd64.deb
+    cpack -G RPM    # → st80-0.1.0-1.x86_64.rpm
+
+Install:
+
+    sudo dpkg -i build-linux/st80_*.deb       # Debian / Ubuntu
+    sudo rpm -i  build-linux/st80-*.rpm       # Fedora / RHEL / SUSE
+
+The package installs `/usr/bin/st80-linux` and a desktop menu entry.
+It does not bundle the Xerox image — that has its own licence terms;
+see `/usr/share/doc/st80/README.md` for the fetcher command.
+
 ## What's in the box
 
     src/core/                C++17 VM core — Oops, RealWordMemory,
@@ -114,10 +165,16 @@ Just Works.
                              interfaces the core speaks through.
     src/include/Bridge.h     Pure-C API the frontend consumes.
     src/platform/apple/      AppleHal + Bridge.h implementation.
-    src/platform/posix/      POSIX IFileSystem.
+    src/platform/linux/      LinuxHal + Bridge.h implementation.
+    src/platform/posix/      POSIX IFileSystem (macOS + Linux).
+    src/platform/common/     Host-neutral EventQueue.
     src/platform/headless/   No-op IHal (tests + tools).
     app/apple/               SwiftUI + Metal AppKit frontend (macOS).
     app/apple-catalyst/      SwiftUI + Metal UIKit frontend (Catalyst).
+    app/linux/               SDL2 frontend (Linux).
+    cmake/LinuxPackaging.cmake
+                             CPack config for .deb and .rpm.
+    packaging/linux/         .desktop file.
     tools/                   st80_probe (loader sanity), st80_run
                              (trace tool).
     tests/                   CTest smoke + end-to-end bridge test.
