@@ -16,6 +16,19 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+# MSVC: project-wide warning level + sensible defaults so all
+# TUs see the same Win32 macros regardless of which slice pulls
+# in <windows.h>.
+if(MSVC)
+    add_compile_definitions(
+        _CRT_SECURE_NO_WARNINGS   # _open / _fstat64 / strerror
+        _WINSOCK_DEPRECATED_NO_WARNINGS
+        WIN32_LEAN_AND_MEAN
+        NOMINMAX
+    )
+    add_compile_options(/utf-8 /Zc:preprocessor /EHsc)
+endif()
+
 # --- core library ---------------------------------------------------
 # Shared VM core: no platform deps, no UI. Phase 1 adds ObjectMemory,
 # Interpreter, Primitives, BitBlt, ImageLoader. Everything included
@@ -52,11 +65,25 @@ if(UNIX AND NOT APPLE)
     add_subdirectory(src/platform/linux)
     add_subdirectory(app/linux)
 endif()
-# Phase 4: add_subdirectory(src/platform/win32)
+
+# Windows: pure-Win32 + GDI frontend, WindowsHal/Bridge,
+# WindowsFileSystem. No SDL — see app/windows for rationale.
+# RC language must be enabled explicitly so the version-info +
+# manifest + icon resources compile as part of the app target.
+if(WIN32)
+    enable_language(RC)
+    add_subdirectory(src/platform/windows)
+    add_subdirectory(app/windows)
+endif()
 
 # --- packaging ------------------------------------------------------
-# CPack only runs on Linux for now: Mac uses xcodebuild → App Store,
-# and Windows packaging lands with the Phase 4 Win32 slice.
+# Linux: CPack → DEB + RPM.
+# Windows: CPack → NSIS (self-extracting installer) + WIX (.msi),
+#          plus MSIX AppX layout for Microsoft Store submission.
+# Mac: xcodebuild → App Store (no CPack).
 if(UNIX AND NOT APPLE)
     include(cmake/LinuxPackaging.cmake)
+endif()
+if(WIN32)
+    include(cmake/WindowsPackaging.cmake)
 endif()

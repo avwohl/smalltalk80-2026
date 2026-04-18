@@ -2,6 +2,142 @@
 
 User-visible changes. Most-recent build on top.
 
+## build 26 — 2026-04-17
+
+**Windows port (x64) — Phase 4 second target.**
+
+Second non-Apple target, done the same way the Linux slice was:
+a dedicated `src/platform/windows/` directory behind `IHal` and
+`Bridge.h`, a dedicated `src/platform/win/` with the IFileSystem
+implementation, and a pure-Win32 frontend under `app/windows/`.
+No `#ifdef` mixed into the portable layers.
+
+The frontend deliberately does not use SDL. On Apple we render
+through SwiftUI+Metal; on Linux we use SDL2 (lingua-franca of X11
++ Wayland + KMS); on Windows we use native Win32 + GDI
+`StretchDIBits` directly. That avoids shipping SDL2.dll in the
+installer + MSIX, which in turn keeps the Microsoft Store
+submission self-contained (no third-party redistributables to
+declare).
+
+New files:
+
+  - `src/platform/windows/WindowsHal.{hpp,cpp}` — IHal impl.
+    RGBA8 staging buffer + dirty rect + `signal_at` scheduling +
+    shared-header EventQueue. Wall-clock Smalltalk epoch
+    (1901-01-01) from `chrono::system_clock`. Structurally
+    identical to LinuxHal and AppleHal; no Win32 calls at all —
+    the portable `<chrono>` / `<mutex>` / `<atomic>` subset is
+    enough for the HAL contract.
+  - `src/platform/windows/WindowsBridge.cpp` — implements
+    `Bridge.h` on top of WindowsHal + Interpreter +
+    WindowsFileSystem. Splits image paths on both `\` and `/`
+    so drag-and-drop from Explorer and CLI / shell usage both
+    work.
+  - `src/platform/windows/CMakeLists.txt` — builds the
+    `st80_windows` static lib; wired in via `if(WIN32)` from
+    the top-level `CMakeLists.txt`.
+  - `src/platform/win/WindowsFileSystem.hpp` — header-only
+    Win32 implementation of IFileSystem. CRT-level `_open` /
+    `_read` / `_write` / `_lseek` / `_chsize` / `_fstat64` /
+    `_commit` for file I/O (matches IFileSystem's `int`
+    file-handle contract), Win32 `FindFirstFileA` /
+    `MoveFileExA` / `DeleteFileA` / `GetFileAttributesA` for
+    directory / rename / delete / stat.
+  - `src/platform/win/HostFileSystem.hpp` +
+    `src/platform/posix/HostFileSystem.hpp` — one-line alias
+    headers so tools (`st80_probe`, `st80_run`,
+    `st80_validate`) include `HostFileSystem.hpp` and get the
+    right IFileSystem impl per platform. CMake picks the
+    include dir; no `#ifdef` in source.
+  - `app/windows/st80_windows_main.cpp` — pure-Win32 desktop
+    frontend. `WinMain` entry (/SUBSYSTEM:WINDOWS, no console
+    window), `CommandLineToArgvW` + UTF-8 conversion for
+    arguments, `RegisterClassExW` + `CreateWindowExW` window,
+    `PeekMessage` idle loop interleaved with `st80_run`,
+    `StretchDIBits` with a top-down 32-bit BI_RGB DIB for the
+    1-bit VM display buffer. Mouse buttons map to red / yellow
+    / blue; Ctrl+Left = blue, Alt+Left = yellow for the common
+    single-button-mouse case. `WM_CHAR` feeds 7-bit ASCII into
+    `st80_post_key_down`; `VK_DELETE` is routed manually since
+    it has no WM_CHAR counterpart. `--no-window` flag drives a
+    headless smoke-test loop.
+  - `app/windows/st80-win.rc` + `st80-win.manifest` +
+    `st80-win-icon.rc` — side-by-side manifest enabling
+    per-monitor DPI v2, Common Controls v6, long-path,
+    UTF-8 active code page; VS_VERSION_INFO populated from
+    PROJECT_VERSION at configure time; icon resource guarded
+    by `EXISTS` so a fresh clone builds without requiring the
+    binary `.ico` asset.
+  - `app/windows/CMakeLists.txt` — `WIN32_EXECUTABLE` target;
+    links `gdi32` / `user32` / `shell32` / `comdlg32`; embeds
+    the .rc under `$<COMPILE_LANGUAGE:RC>` so rc-only defines
+    don't pollute the C++ compilation.
+  - `cmake/WindowsPackaging.cmake` — CPack with NSIS + WIX
+    generators (self-extracting `.exe` installer + traditional
+    `.msi`), plus a custom `st80_appx_layout` target that
+    stages an MSIX / AppX directory (`AppxManifest.xml` at
+    root, `bin/st80-win.exe`, `Assets/`) ready for
+    `MakeAppx.exe pack`. Upgrade GUID is stable across
+    versions so the MSI upgrades cleanly rather than
+    side-installing.
+  - `packaging/windows/AppxManifest.xml.in` — CMake template
+    for the AppxManifest, expanded at configure time with
+    version + architecture + publisher. Targets Windows 10
+    1809+ (first MSIX-capable build). Declares
+    `runFullTrust` — the capability a Win32 `.exe` needs to
+    live inside a Store package.
+  - `packaging/windows/pack-msix.ps1` — PowerShell wrapper
+    around `MakeAppx.exe pack` + optional `SignTool.exe sign`
+    for side-loading. Auto-discovers the SDK tools under
+    `%ProgramFiles(x86)%\Windows Kits\10\bin\*`.
+  - `packaging/windows/build-release.ps1` — one-shot release
+    build: configure → build → test → NSIS + WIX + MSIX.
+  - `packaging/windows/Assets/` + `resources/windows/` — asset
+    staging dirs with README-documented filename expectations
+    (StoreLogo.png, Square150x150Logo.png, Wide310x150Logo.png,
+    etc. for MSIX; st80.ico for the installer + EXE).
+
+Tools + tests changes:
+
+  - `tools/{st80_probe,st80_run,st80_validate}.cpp` — switched
+    from `#include "PosixFileSystem.hpp"` to
+    `#include "HostFileSystem.hpp"`. Path splits now accept
+    both `\` and `/`.
+  - `tools/CMakeLists.txt` — per-platform `ST80_TOOLS_FS_DIR`
+    selects the correct alias header (no `#ifdef`).
+  - `tests/CMakeLists.txt` — `trace2_check.sh` (bash) gated to
+    `if(UNIX)` so Windows CTest runs don't fail on the missing
+    shell; the Mac and Linux toolchains still see it.
+  - Top-level `CMakeLists.txt` — MSVC-only block enables
+    `/utf-8 /Zc:preprocessor /EHsc`, pre-defines
+    `WIN32_LEAN_AND_MEAN`, `NOMINMAX`, and
+    `_CRT_SECURE_NO_WARNINGS` (the CRT's POSIX-emulation
+    wrappers trigger deprecation noise otherwise).
+    `enable_language(RC)` inside the `if(WIN32)` block brings
+    resource compilation online.
+
+Build + package commands (x64, VS 2022):
+
+    cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+    cmake --build build --config Release --parallel
+    cd build && ctest -C Release --output-on-failure
+    cd build && cpack -G NSIS -C Release      # st80-0.1.0-Windows-AMD64.exe
+    cd build && cpack -G WIX  -C Release      # st80-0.1.0-Windows-AMD64.msi
+    cmake --build build --target st80_appx_layout --config Release
+    powershell -ExecutionPolicy Bypass -File packaging/windows/pack-msix.ps1 `
+        -Layout build/st80-0.1.0-appx -Output build/st80-0.1.0.msix
+
+Or the one-shot:
+
+    powershell -ExecutionPolicy Bypass `
+        -File packaging/windows/build-release.ps1 -Arch x64
+
+ARM64 is reachable by passing `-A ARM64` to the configure step —
+the Windows slice is architecture-agnostic and doesn't touch the
+JIT (Phase 6). A separate pass will wire the ARM64 CI job once
+the Phase-6 JIT backend needs it.
+
 ## build 25 — 2026-04-17
 
 **Linux port (x86_64) — Phase 4 kickoff.**

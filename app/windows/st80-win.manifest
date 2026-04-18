@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <!--
+    st80-2026 side-by-side manifest. Opts the EXE into per-monitor
+    DPI awareness v2, Common Controls v6 visual styles, and the
+    long-path-aware file-system APIs. Lands on disk next to the
+    EXE and gets embedded as RT_MANIFEST #1 via st80-win.rc.
+  -->
+
+  <assemblyIdentity type="win32"
+                    name="AaronWohl.Smalltalk80"
+                    version="0.1.0.0"
+                    processorArchitecture="*"/>
+
+  <!-- Common Controls v6 (themed menus + buttons). -->
+  <dependency>
+    <dependentAssembly>
+      <assemblyIdentity
+        type="win32"
+        name="Microsoft.Windows.Common-Controls"
+        version="6.0.0.0"
+        publicKeyToken="6595b64144ccf1df"
+        language="*"
+        processorArchitecture="*"/>
+    </dependentAssembly>
+  </dependency>
+
+  <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
+    <application>
+      <!-- Windows 10 + Windows 11. -->
+      <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}"/>
+    </application>
+  </compatibility>
+
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <!-- Per-monitor DPI v2 — we render into a DIB and let the
+           compositor do the (linear) stretch, but Windows still
+           needs to hand us un-virtualized client coordinates. -->
+      <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">
+        PerMonitorV2
+      </dpiAwareness>
+      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">
+        True/PM
+      </dpiAware>
+      <longPathAware
+        xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">
+        true
+      </longPathAware>
+      <activeCodePage
+        xmlns="http://schemas.microsoft.com/SMI/2019/WindowsSettings">
+        UTF-8
+      </activeCodePage>
+    </windowsSettings>
+  </application>
+
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
+    <security>
+      <requestedPrivileges>
+        <requestedExecutionLevel level="asInvoker" uiAccess="false"/>
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+</assembly>

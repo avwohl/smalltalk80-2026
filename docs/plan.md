@@ -122,9 +122,15 @@ Direct2D or plain GDI on Windows. SDL2 on Linux.
 **Linux landed 2026-04-17 (build 25).** `st80-linux` renders the
 Xerox desktop under SDL2 on Ubuntu 25.10; `.deb` and `.rpm` packages
 ship via CPack. No `#ifdef` in the platform layer — each host gets
-its own files behind `IHal` and `Bridge.h`. ARM Linux next; Windows
-after.
-**Exit:** doIt works on both; no Apple regressions.
+its own files behind `IHal` and `Bridge.h`.
+**Windows landed 2026-04-17 (build 26).** `st80-win.exe` is a
+pure-Win32 + GDI frontend (no SDL — keeps the Store submission
+self-contained, no redistributable). CPack emits both an NSIS
+self-extracting installer (`.exe`) and a WiX MSI; a custom
+`st80_appx_layout` CMake target stages an MSIX / AppX directory
+that `MakeAppx.exe pack` turns into a `.msix` suitable for
+Microsoft Store upload. ARM64 reachable via `-A ARM64`.
+**Exit:** doIt works on all three hosts; no Apple regressions.
 
 ### Phase 5 — Polish & release gate (week 9)
 Interpreter performance audit — cache OOP→address, inline-cache send
@@ -163,6 +169,11 @@ regressions vs interpreter on a recorded trace.
 
 - (resolved 2026-04-17) Phase 4 order: Linux first (x86_64 Ubuntu
   host available). Windows next.
+- (resolved 2026-04-17) Windows UI stack: plain Win32 + GDI
+  `StretchDIBits`, no SDL, no Direct2D. Rationale: a 1024x768
+  RGBA blit at 60 fps is trivial for GDI, and the Store MSIX
+  must not declare a third-party redistributable unless we host
+  it ourselves.
 
 ## Prerequisites before Phase 1
 

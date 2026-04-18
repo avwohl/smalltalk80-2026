@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  st80-2026 — AppxManifest.xml template.
+
+  This is the authoritative schema for Microsoft Store submission.
+  CMake's configure_file() expands @ST80_*@ placeholders into the
+  final AppxManifest.xml placed in the MSIX staging directory.
+  The Store enforces that:
+
+    * Identity/@Name and Identity/@Publisher are the exact strings
+      from Partner Center (Publisher Display Name + Package name).
+      For unsigned side-loading builds, "CN=Aaron Wohl" is fine;
+      Partner Center will hand you the real Publisher string once
+      your reservation is approved.
+
+    * Identity/@Version is a 4-part Major.Minor.Build.Revision
+      where Revision is reserved for the Store (must be 0 on
+      upload).
+
+    * Package-relative paths (Executable, Logo, SplashScreen)
+      resolve against the AppxManifest.xml root. Our staging
+      dir keeps the binary at bin/st80-win.exe and the Store
+      assets under Assets/ — matching the paths below.
+
+  Target Windows 10/11 only. Earlier builds cannot load MSIX.
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap rescap">
+
+  <Identity Name="@ST80_APPX_PACKAGE_NAME@"
+            Publisher="@ST80_APPX_PUBLISHER@"
+            Version="@ST80_APPX_VERSION@"
+            ProcessorArchitecture="@ST80_APPX_ARCH@"/>
+
+  <Properties>
+    <DisplayName>@ST80_APPX_DISPLAY_NAME@</DisplayName>
+    <PublisherDisplayName>@ST80_APPX_PUBLISHER_DISPLAY_NAME@</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+    <Description>
+      A faithful implementation of the 1983 Xerox Smalltalk-80
+      Blue Book virtual machine. Loads Wolczko's v2 image and
+      runs the original Xerox desktop (Browser, Workspace,
+      Transcript, etc.). Pure-Win32 frontend, no SDL, no
+      redistributables.
+    </Description>
+  </Properties>
+
+  <Dependencies>
+    <!-- Minimum: Windows 10 1809 (build 17763). MSIX support
+         and per-monitor DPI v2 both require >= that build. -->
+    <TargetDeviceFamily
+      Name="Windows.Desktop"
+      MinVersion="10.0.17763.0"
+      MaxVersionTested="10.0.26100.0"/>
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-us"/>
+  </Resources>
+
+  <Applications>
+    <Application Id="Smalltalk80"
+                 Executable="bin\st80-win.exe"
+                 EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="@ST80_APPX_DISPLAY_NAME@"
+        Description="Smalltalk-80 Blue Book (1983)"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png"
+        BackgroundColor="#1E1E1E">
+        <uap:DefaultTile
+          Wide310x150Logo="Assets\Wide310x150Logo.png"
+          Square71x71Logo="Assets\Square71x71Logo.png"
+          Square310x310Logo="Assets\Square310x310Logo.png"/>
+        <uap:SplashScreen
+          Image="Assets\SplashScreen.png"
+          BackgroundColor="#1E1E1E"/>
+      </uap:VisualElements>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <!-- Traditional desktop app permissions. runFullTrust is the
+         capability that lets a Win32 .exe live inside an MSIX. -->
+    <rescap:Capability Name="runFullTrust"/>
+  </Capabilities>
+</Package>

@@ -1,0 +1,6 @@
+// st80-2026 — app icon resource.
+//
+// Compiled only when resources/windows/st80.ico is present. The
+// main resource script (st80-win.rc) stays icon-free so a fresh
+// clone without artwork still builds.
+1 ICON "..\\..\\resources\\windows\\st80.ico"

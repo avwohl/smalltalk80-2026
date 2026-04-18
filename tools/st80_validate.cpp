@@ -28,7 +28,7 @@
 #include <vector>
 
 #include "ObjectMemory.hpp"
-#include "PosixFileSystem.hpp"
+#include "HostFileSystem.hpp"
 #include "HeadlessHal.hpp"
 #include "Sha256.hpp"
 
@@ -41,7 +41,7 @@ struct Paths {
 
 Paths splitPath(const std::string &full) {
     Paths p{".", full};
-    const auto slash = full.find_last_of('/');
+    const auto slash = full.find_last_of("\\/");
     if (slash != std::string::npos) {
         p.dir = full.substr(0, slash);
         p.name = full.substr(slash + 1);
@@ -106,7 +106,7 @@ void checkObject(st80::ObjectMemory &memory, int oop, int *remaining) {
 
 int cmdCheck(const std::string &path) {
     const auto p = splitPath(path);
-    st80::PosixFileSystem fs(p.dir);
+    st80::HostFileSystem fs(p.dir);
     st80::HeadlessHal hal;
     st80::ObjectMemory memory(&hal);
 
@@ -133,7 +133,7 @@ int cmdCheck(const std::string &path) {
 
 int cmdShaSum(const std::string &path) {
     const auto p = splitPath(path);
-    st80::PosixFileSystem fs(p.dir);
+    st80::HostFileSystem fs(p.dir);
     st80::HeadlessHal hal;
     st80::ObjectMemory memory(&hal);
 

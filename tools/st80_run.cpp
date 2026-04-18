@@ -25,7 +25,7 @@
 
 #include "Interpreter.hpp"
 #include "ObjectMemory.hpp"
-#include "PosixFileSystem.hpp"
+#include "HostFileSystem.hpp"
 #include "HeadlessHal.hpp"
 
 static void usage(const char *argv0) {
@@ -52,13 +52,13 @@ int main(int argc, char **argv) {
     const std::string fullPath = argv[argi];
     std::string dir = ".";
     std::string name = fullPath;
-    const auto slash = fullPath.find_last_of('/');
+    const auto slash = fullPath.find_last_of("\\/");
     if (slash != std::string::npos) {
         dir = fullPath.substr(0, slash);
         name = fullPath.substr(slash + 1);
     }
 
-    st80::PosixFileSystem fs(dir);
+    st80::HostFileSystem fs(dir);
     st80::HeadlessHal hal;
     hal.set_image_name(name.c_str());
     st80::Interpreter vm(&hal, &fs);

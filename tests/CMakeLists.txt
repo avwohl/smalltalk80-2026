@@ -21,12 +21,16 @@ endif()
 
 # Phase 1 gate regression check: diff st80_run output vs the Xerox
 # trace2 reference. Skipped when the image or trace file isn't
-# present in reference/xerox-image/.
-add_test(
-    NAME trace2_check
-    COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/trace2_check.sh
-            ${CMAKE_SOURCE_DIR}/reference/xerox-image/VirtualImage
-            ${CMAKE_SOURCE_DIR}/reference/xerox-image/trace2
-            $<TARGET_FILE:st80_run>
-)
-set_tests_properties(trace2_check PROPERTIES SKIP_RETURN_CODE 77)
+# present in reference/xerox-image/. The check is a bash script —
+# on Windows it runs from Git Bash or WSL, so gate it to UNIX
+# hosts and let CI add a separate Windows smoke test below.
+if(UNIX)
+    add_test(
+        NAME trace2_check
+        COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/trace2_check.sh
+                ${CMAKE_SOURCE_DIR}/reference/xerox-image/VirtualImage
+                ${CMAKE_SOURCE_DIR}/reference/xerox-image/trace2
+                $<TARGET_FILE:st80_run>
+    )
+    set_tests_properties(trace2_check PROPERTIES SKIP_RETURN_CODE 77)
+endif()

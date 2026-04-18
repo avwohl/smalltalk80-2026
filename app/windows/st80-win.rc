@@ -1,0 +1,63 @@
+// st80-2026 — Win32 resource script.
+//
+// Ships the side-by-side manifest (per-monitor DPI v2, Common
+// Controls v6, long-path + UTF-8 code page) and VS_VERSION_INFO
+// so Explorer / Task Manager / Store submission tooling all see
+// a real version number.
+//
+// The icon ship-or-not logic lives in st80-win-icon.rc, which is
+// compiled only when resources/windows/st80.ico exists — keeping
+// a fresh clone buildable without having to commit binary art.
+
+#include <winver.h>
+
+// -----------------------------------------------------------------
+// Side-by-side manifest: per-monitor DPI v2 + Common Controls v6
+// + long-path + UTF-8 code page. Embedded as resource #1 of type
+// RT_MANIFEST (24). The Win32 loader picks it up automatically.
+// -----------------------------------------------------------------
+1 24 "st80-win.manifest"
+
+// -----------------------------------------------------------------
+// VS_VERSION_INFO — populated by CMake at configure time via
+// -DST80_* compile defines, but defaults here so a raw
+// "cl /W4 st80-win.rc" still produces something sensible.
+// -----------------------------------------------------------------
+#ifndef ST80_FILE_VERSION
+#define ST80_FILE_VERSION       0,1,0,0
+#endif
+#ifndef ST80_PRODUCT_VERSION
+#define ST80_PRODUCT_VERSION    0,1,0,0
+#endif
+#ifndef ST80_VERSION_STRING
+#define ST80_VERSION_STRING     "0.1.0.0"
+#endif
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION     ST80_FILE_VERSION
+ PRODUCTVERSION  ST80_PRODUCT_VERSION
+ FILEFLAGSMASK   0x3fL
+ FILEFLAGS       0x0L
+ FILEOS          VOS_NT_WINDOWS32
+ FILETYPE        VFT_APP
+ FILESUBTYPE     0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "CompanyName",      "Aaron Wohl"
+            VALUE "FileDescription",  "Smalltalk-80 Blue Book (1983) implementation"
+            VALUE "FileVersion",      ST80_VERSION_STRING
+            VALUE "InternalName",     "st80-win"
+            VALUE "LegalCopyright",   "Copyright (c) 2026 Aaron Wohl. MIT License."
+            VALUE "OriginalFilename", "st80-win.exe"
+            VALUE "ProductName",      "Smalltalk-80"
+            VALUE "ProductVersion",   ST80_VERSION_STRING
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END
