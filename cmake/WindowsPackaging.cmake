@@ -123,9 +123,19 @@ set(ST80_APPX_PUBLISHER "CN=Aaron Wohl")
 set(ST80_APPX_PACKAGE_NAME "AaronWohl.Smalltalk80")
 set(ST80_APPX_DISPLAY_NAME "Smalltalk-80")
 set(ST80_APPX_PUBLISHER_DISPLAY_NAME "Aaron Wohl")
-if("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "ARM64|arm64")
+# Prefer CMAKE_GENERATOR_PLATFORM (the Visual Studio generator's -A
+# arg). CMAKE_SYSTEM_PROCESSOR reflects the HOST, so on a cross
+# build from x64 → ARM64 it stays "AMD64" and would mis-tag the
+# .msix. Fall back to the host when no explicit platform was set
+# (e.g. Ninja on a native host).
+if(CMAKE_GENERATOR_PLATFORM)
+    set(_st80_appx_platform "${CMAKE_GENERATOR_PLATFORM}")
+else()
+    set(_st80_appx_platform "${CMAKE_SYSTEM_PROCESSOR}")
+endif()
+if("${_st80_appx_platform}" MATCHES "ARM64|arm64")
     set(ST80_APPX_ARCH "arm64")
-elseif("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "AMD64|amd64|x86_64|X86_64")
+elseif("${_st80_appx_platform}" MATCHES "AMD64|amd64|x86_64|X86_64|x64")
     set(ST80_APPX_ARCH "x64")
 else()
     set(ST80_APPX_ARCH "x86")

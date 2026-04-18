@@ -2,6 +2,50 @@
 
 User-visible changes. Most-recent build on top.
 
+## build 30 — 2026-04-18
+
+**Windows packaging: cross-arch `.msixbundle` for Store release.**
+
+`packaging/windows/build-release.ps1` now accepts an `-Archs` list
+(e.g. `-Archs x64,ARM64`) and drives per-architecture builds into
+`build-<arch>/`, emitting one `.msix` per architecture and then
+combining them into a single `build/st80-<ver>.msixbundle` via a
+new `packaging/windows/pack-msixbundle.ps1` helper. This is the
+artifact Partner Center wants for Store submission — the Store
+inspects the bundle manifest and serves each device the package
+that matches its CPU (x64 for Intel/AMD, arm64 for Snapdragon X /
+Copilot+ PCs).
+
+Fixes along the way:
+
+  - `cmake/WindowsPackaging.cmake` now reads
+    `CMAKE_GENERATOR_PLATFORM` (the Visual Studio `-A` value)
+    rather than `CMAKE_SYSTEM_PROCESSOR` when tagging
+    `ProcessorArchitecture` in `AppxManifest.xml`. On a cross
+    build from x64 → ARM64, the host-side `CMAKE_SYSTEM_PROCESSOR`
+    stays `AMD64`, which previously mis-tagged the ARM64
+    `.msix` as x64 and made `MakeAppx bundle` reject the bundle
+    for arch collision.
+  - `AppxManifest.xml.in` collapsed the multi-line
+    `<Description>` into a single line. The AppX schema rejects
+    control characters (`[^\x01-\x1f]+`), so the pretty-printed
+    version failed `MakeAppx pack` schema validation.
+  - WiX is now optional: if the WiX Toolset isn't on PATH, the
+    `cpack -G WIX` step warns instead of aborting — the
+    `.msixbundle` + NSIS `.exe` cover every distribution channel
+    we care about.
+
+New files:
+
+  - `packaging/windows/pack-msixbundle.ps1` — wraps
+    `MakeAppx.exe bundle` over a set of per-arch `.msix` paths,
+    optionally signing the bundle for side-load. Not needed for
+    Store uploads (the Store re-signs).
+  - `build_arm64.bat` (previous commit) — parallel to `build.bat`,
+    builds under `build-arm64/` with `-A ARM64`. Requires the
+    `Microsoft.VisualStudio.Component.VC.Tools.ARM64` VS
+    component (x64-hosted ARM64 cross-compiler).
+
 ## build 29 — 2026-04-18
 
 **Windows launcher: iospharo parity + SHA256-verified downloads.**

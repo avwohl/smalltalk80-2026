@@ -39,13 +39,7 @@
     <DisplayName>@ST80_APPX_DISPLAY_NAME@</DisplayName>
     <PublisherDisplayName>@ST80_APPX_PUBLISHER_DISPLAY_NAME@</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
-    <Description>
-      A faithful implementation of the 1983 Xerox Smalltalk-80
-      Blue Book virtual machine. Loads Wolczko's v2 image and
-      runs the original Xerox desktop (Browser, Workspace,
-      Transcript, etc.). Pure-Win32 frontend, no SDL, no
-      redistributables.
-    </Description>
+    <Description>A faithful implementation of the 1983 Xerox Smalltalk-80 Blue Book virtual machine. Loads Wolczko's v2 image and runs the original Xerox desktop (Browser, Workspace, Transcript, etc.). Pure-Win32 frontend, no SDL, no redistributables.</Description>
   </Properties>
 
   <Dependencies>
