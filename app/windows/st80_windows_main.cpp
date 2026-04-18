@@ -38,6 +38,8 @@
 #endif
 
 #include "Bridge.h"
+#include "Launcher.hpp"
+#include "AboutDialog.hpp"
 
 #include <windows.h>
 #include <windowsx.h>  // GET_X_LPARAM / GET_Y_LPARAM
@@ -53,16 +55,36 @@
 
 namespace {
 
+// Menu command IDs. Kept out of any resource header because the
+// menubar is built from code via CreateMenu/AppendMenuW — ties the
+// IDs to the WM_COMMAND handler and nothing else.
+constexpr UINT kIdFileExit   = 0x9001;
+constexpr UINT kIdEditCopy   = 0x9002;
+constexpr UINT kIdEditPaste  = 0x9003;
+constexpr UINT kIdHelpAbout  = 0x9004;
+
 struct Args {
     std::string imagePath;
-    int cyclesPerFrame = 4000;
-    bool noWindow = false;
+    int  cyclesPerFrame = 4000;
+    bool noWindow       = false;
+    bool forceLauncher  = false;   // --launcher flag
 };
 
 void usage() {
-    std::fprintf(stderr,
-        "usage: st80-win.exe [--cycles-per-frame N] [--no-window]"
-        " <path-to-image>\n");
+    // /SUBSYSTEM:WINDOWS apps have no console, so a stderr write
+    // disappears and the user sees a silent exit. Show a MessageBox
+    // so command-line misuse is at least visible.
+    static const wchar_t kMsg[] =
+        L"usage: st80-win.exe [--cycles-per-frame N] [--no-window]"
+        L" [--launcher] [<path-to-image>]\n"
+        L"\n"
+        L"With no image path, st80-win opens a launcher to pick or"
+        L" download an image.\n"
+        L"--launcher forces the launcher even when one was used"
+        L" previously.";
+    std::fprintf(stderr, "%ls\n", kMsg);
+    MessageBoxW(nullptr, kMsg, L"Smalltalk-80",
+                MB_ICONINFORMATION | MB_OK);
 }
 
 // Convert a UTF-16 argv from CommandLineToArgvW into UTF-8 narrow
@@ -102,6 +124,9 @@ int parseArgs(Args &out) {
         } else if (a == "--no-window") {
             out.noWindow = true;
             ++i;
+        } else if (a == "--launcher") {
+            out.forceLauncher = true;
+            ++i;
         } else if (!a.empty() && a[0] == '-' && a.size() > 1) {
             usage();
             return 64;
@@ -111,7 +136,12 @@ int parseArgs(Args &out) {
             ++i;
         }
     }
-    if (out.imagePath.empty()) { usage(); return 64; }
+    // Headless mode demands an image on the command line — there's
+    // no UI to pick one. The launcher only runs when there is one.
+    if (out.noWindow && out.imagePath.empty()) {
+        usage();
+        return 64;
+    }
     return 0;
 }
 
@@ -126,9 +156,111 @@ struct WindowState {
     bool running = true;
     bool haveDisplay = false;
     BITMAPINFO bmi{};     // cached DIB header for StretchDIBits
+
+    // Smalltalk-drawn mouse cursor (§BB 30 — the image updates the
+    // cursor form when the pointer enters a scroll-bar region, a
+    // text-selection region, etc.). We poll `st80_cursor_image`
+    // every frame, hash the 16×16 bitmap, and rebuild the HCURSOR
+    // only when it changes.
+    HCURSOR        cursor     = nullptr;
+    std::uint64_t  cursorHash = 0;
 };
 
 WindowState *g_state = nullptr;
+
+// ----------------------------------------------------------------------------
+// Cursor construction
+// ----------------------------------------------------------------------------
+//
+// The Smalltalk cursor is stored as 16 16-bit words with bit (15 - x)
+// of word y giving pixel (x, y). Bit set = black, bit clear =
+// transparent. Windows monochrome cursors take an AND mask + XOR mask
+// pair:
+//
+//      AND=0 XOR=0  → black
+//      AND=0 XOR=1  → white
+//      AND=1 XOR=0  → transparent (screen passes through)
+//      AND=1 XOR=1  → inverted
+//
+// So "Smalltalk bit set" → AND=0, XOR=0 and "Smalltalk bit clear"
+// → AND=1, XOR=0. The Blue Book hotspot is the upper-left of the
+// form (0, 0); image coordinates already account for it.
+
+std::uint64_t hashCursorBits(const std::uint16_t bits[16]) {
+    std::uint64_t h = 14695981039346656037ULL;
+    for (int i = 0; i < 16; ++i) {
+        h ^= bits[i];
+        h *= 1099511628211ULL;
+    }
+    return h;
+}
+
+HCURSOR buildCursorFromBits(const std::uint16_t bits[16]) {
+    BYTE andMask[32];
+    BYTE xorMask[32];
+    for (int y = 0; y < 16; ++y) {
+        const std::uint16_t w = bits[y];
+        // In a monochrome Win32 bitmap row, bit 7 of byte 0 is the
+        // leftmost pixel — matches Smalltalk's bit-15-is-leftmost
+        // layout when we split the word hi/lo.
+        const BYTE hi = static_cast<BYTE>((w >> 8) & 0xff);
+        const BYTE lo = static_cast<BYTE>(w & 0xff);
+        andMask[y * 2 + 0] = static_cast<BYTE>(~hi);
+        andMask[y * 2 + 1] = static_cast<BYTE>(~lo);
+        xorMask[y * 2 + 0] = 0;
+        xorMask[y * 2 + 1] = 0;
+    }
+    HBITMAP hAnd = CreateBitmap(16, 16, 1, 1, andMask);
+    HBITMAP hXor = CreateBitmap(16, 16, 1, 1, xorMask);
+    if (!hAnd || !hXor) {
+        if (hAnd) DeleteObject(hAnd);
+        if (hXor) DeleteObject(hXor);
+        return nullptr;
+    }
+    ICONINFO ii{};
+    ii.fIcon    = FALSE;   // FALSE → cursor, not icon
+    ii.xHotspot = 0;
+    ii.yHotspot = 0;
+    ii.hbmMask  = hAnd;
+    ii.hbmColor = hXor;
+    HCURSOR h = CreateIconIndirect(&ii);
+    DeleteObject(hAnd);
+    DeleteObject(hXor);
+    return h;
+}
+
+// Called once per frame. Polls the VM, rebuilds the HCURSOR only on
+// change, and — if the cursor is currently over our client area —
+// applies it immediately. Without the immediate SetCursor we would
+// only pick up the new shape on the next WM_SETCURSOR.
+void refreshCursorIfChanged(WindowState &st) {
+    std::uint16_t bits[16] = {0};
+    st80_cursor_image(bits);
+
+    const std::uint64_t h = hashCursorBits(bits);
+    if (h == st.cursorHash) return;
+    st.cursorHash = h;
+
+    // All-zero form = VM hasn't set a cursor. Drop to the system
+    // arrow rather than showing a blank hotspot.
+    bool allZero = true;
+    for (int i = 0; i < 16; ++i) if (bits[i]) { allZero = false; break; }
+
+    if (st.cursor) { DestroyCursor(st.cursor); st.cursor = nullptr; }
+    if (!allZero)  st.cursor = buildCursorFromBits(bits);
+
+    // If the pointer is currently over our client area, apply the
+    // new cursor immediately — WM_SETCURSOR won't fire until the
+    // pointer moves.
+    POINT pt;
+    if (GetCursorPos(&pt)) {
+        HWND under = WindowFromPoint(pt);
+        if (under == st.hwnd) {
+            SetCursor(st.cursor ? st.cursor
+                                : LoadCursorW(nullptr, IDC_ARROW));
+        }
+    }
+}
 
 void rebuildBitmapInfo(WindowState &st) {
     std::memset(&st.bmi, 0, sizeof(st.bmi));
@@ -163,6 +295,92 @@ std::uint32_t modifiersFromWin32() {
 }
 
 // ----------------------------------------------------------------------------
+// Menu construction
+// ----------------------------------------------------------------------------
+//
+// File     → Exit                            Alt+F4
+// Edit     → Copy Selection... (info dialog) — OS-clipboard copy-out
+//            requires a HAL primitive (see note below)
+//          → Paste from Clipboard            Ctrl+Shift+V
+// Help     → About Smalltalk-80...
+
+HMENU buildMenuBar() {
+    HMENU bar = CreateMenu();
+
+    HMENU fileMenu = CreatePopupMenu();
+    AppendMenuW(fileMenu, MF_STRING, kIdFileExit, L"E&xit\tAlt+F4");
+    AppendMenuW(bar, MF_POPUP | MF_STRING,
+                reinterpret_cast<UINT_PTR>(fileMenu), L"&File");
+
+    HMENU editMenu = CreatePopupMenu();
+    AppendMenuW(editMenu, MF_STRING, kIdEditCopy,
+                L"&Copy Selection...");
+    AppendMenuW(editMenu, MF_STRING, kIdEditPaste,
+                L"&Paste from Clipboard\tCtrl+Shift+V");
+    AppendMenuW(bar, MF_POPUP | MF_STRING,
+                reinterpret_cast<UINT_PTR>(editMenu), L"&Edit");
+
+    HMENU helpMenu = CreatePopupMenu();
+    AppendMenuW(helpMenu, MF_STRING, kIdHelpAbout,
+                L"&About Smalltalk-80...");
+    AppendMenuW(bar, MF_POPUP | MF_STRING,
+                reinterpret_cast<UINT_PTR>(helpMenu), L"&Help");
+
+    return bar;
+}
+
+// ----------------------------------------------------------------------------
+// Clipboard → VM
+// ----------------------------------------------------------------------------
+//
+// Mirrors app/apple-catalyst/St80MTKView.swift:pasteFromSystemClipboard.
+// One-way bridge: the OS clipboard is injected as a stream of key
+// events, so the VM's text editor sees the same input it would see
+// if the user typed the characters. No clipboard-change notifications
+// feed back into the VM. Copy-out (VM selection → OS clipboard) is
+// not implemented — see `showCopyUnsupportedDialog` below.
+void pasteFromClipboard(HWND owner) {
+    if (!OpenClipboard(owner)) return;
+    HANDLE h = GetClipboardData(CF_UNICODETEXT);
+    if (!h) { CloseClipboard(); return; }
+    const wchar_t *text = static_cast<const wchar_t *>(GlobalLock(h));
+    if (!text) { CloseClipboard(); return; }
+
+    for (const wchar_t *p = text; *p; ++p) {
+        unsigned code = static_cast<unsigned>(*p);
+        // Skip surrogates — the Blue Book image speaks 7-bit ASCII.
+        if (code >= 0xD800 && code <= 0xDFFF) continue;
+        if (code == 0x0A) code = 13;             // LF → CR
+        else if (code == 0x09) { /* TAB as-is */ }
+        else if (code == 0x0D) { /* CR as-is */ }
+        else if (code < 0x20 || code > 0x7E) continue;  // clip
+        st80_post_key_down(static_cast<int>(code), 0);
+    }
+
+    GlobalUnlock(h);
+    CloseClipboard();
+}
+
+void showCopyUnsupportedDialog(HWND owner) {
+    // Honest about the limitation rather than pretending the menu
+    // item does something. Mirrors the comment at
+    // app/apple-catalyst/St80MTKView.swift:461 — Mac Catalyst has
+    // the same shape (paste-in works; copy-out would need a HAL
+    // primitive + image modification).
+    MessageBoxW(owner,
+        L"Copying Smalltalk-selected text to the Windows clipboard"
+        L" requires a VM-side primitive that isn't wired up yet.\n\n"
+        L"For now, use Smalltalk's own copy command from the"
+        L" yellow-button (operate) menu inside a text pane — it"
+        L" copies to the image's internal clipboard, which paste"
+        L" inside Smalltalk will read.\n\n"
+        L"Pasting the Windows clipboard INTO Smalltalk does work"
+        L" (Ctrl+Shift+V or Edit \x2192 Paste from Clipboard).",
+        L"Copy to Windows Clipboard",
+        MB_ICONINFORMATION | MB_OK);
+}
+
+// ----------------------------------------------------------------------------
 // Window procedure
 // ----------------------------------------------------------------------------
 
@@ -184,6 +402,17 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             // Prevent GDI from painting white before WM_PAINT — we
             // draw every pixel of the client area ourselves.
             return 1;
+
+        case WM_SETCURSOR:
+            // Only override for the client area. Title-bar, frame,
+            // and resize borders need to show the system cursors
+            // Windows normally draws for them.
+            if (LOWORD(lp) == HTCLIENT) {
+                SetCursor(st->cursor ? st->cursor
+                                     : LoadCursorW(nullptr, IDC_ARROW));
+                return TRUE;
+            }
+            return DefWindowProcW(hwnd, msg, wp, lp);
 
         case WM_PAINT: {
             PAINTSTRUCT ps;
@@ -280,9 +509,48 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             // in most layouts — route it manually as ASCII 127.
             if (wp == VK_DELETE) {
                 st80_post_key_down(127, modifiersFromWin32());
+                return 0;
+            }
+            // Ctrl+Shift+V → paste OS clipboard as keystrokes. We
+            // intentionally avoid plain Ctrl+V so Smalltalk's own
+            // Ctrl+V binding (whatever the image maps it to) keeps
+            // working.
+            if (wp == 'V' &&
+                (GetKeyState(VK_CONTROL) & 0x8000) &&
+                (GetKeyState(VK_SHIFT)   & 0x8000)) {
+                pasteFromClipboard(hwnd);
+                return 0;
             }
             return 0;
         }
+
+        case WM_COMMAND:
+            switch (LOWORD(wp)) {
+                case kIdFileExit:
+                    PostMessageW(hwnd, WM_CLOSE, 0, 0);
+                    return 0;
+                case kIdEditCopy:
+                    showCopyUnsupportedDialog(hwnd);
+                    return 0;
+                case kIdEditPaste:
+                    pasteFromClipboard(hwnd);
+                    return 0;
+                case kIdHelpAbout:
+                    st80::ShowAboutDialog(hwnd);
+                    return 0;
+            }
+            break;
+
+        case WM_KILLFOCUS:
+            // Alt-Tab and click-away can leave us mid-drag with a
+            // captured mouse and a half-sent button event. Release
+            // the capture so the next click on return to our window
+            // starts cleanly. Posted VM state is not rolled back —
+            // the VM tracks its own button state via post_mouse_*,
+            // and the user reported text-selection oddities after
+            // alt-tabbing (see docs/changes.md build 28).
+            if (GetCapture() == hwnd) ReleaseCapture();
+            return 0;
 
         default:
             break;
@@ -351,11 +619,13 @@ int runWindowed(HINSTANCE hInstance, const Args &args) {
 
     // Add non-client padding so the VM's inner area stays the
     // advertised size. AdjustWindowRect accounts for the title
-    // bar + frame for the chosen WS_* style.
+    // bar + frame + menu bar for the chosen WS_* style.
     const DWORD style   = WS_OVERLAPPEDWINDOW;
     const DWORD exStyle = 0;
     RECT wantedClient{0, 0, W, H};
-    AdjustWindowRectEx(&wantedClient, style, FALSE, exStyle);
+    AdjustWindowRectEx(&wantedClient, style, TRUE, exStyle);
+
+    HMENU menuBar = buildMenuBar();
 
     HWND hwnd = CreateWindowExW(
         exStyle, wc.lpszClassName, L"Smalltalk-80",
@@ -363,7 +633,7 @@ int runWindowed(HINSTANCE hInstance, const Args &args) {
         CW_USEDEFAULT, CW_USEDEFAULT,
         wantedClient.right - wantedClient.left,
         wantedClient.bottom - wantedClient.top,
-        nullptr, nullptr, hInstance, nullptr);
+        nullptr, menuBar, hInstance, nullptr);
     if (!hwnd) {
         MessageBoxW(nullptr, L"CreateWindow failed.",
                     L"Smalltalk-80", MB_ICONERROR | MB_OK);
@@ -391,6 +661,10 @@ int runWindowed(HINSTANCE hInstance, const Args &args) {
 
         st80_run(args.cyclesPerFrame);
 
+        // Pick up any cursor form the image may have written this
+        // frame (scroll-bar regions, text selection, etc.).
+        refreshCursorIfChanged(state);
+
         // Handle VM-driven display resize.
         const int nw = st80_display_width();
         const int nh = st80_display_height();
@@ -399,7 +673,7 @@ int runWindowed(HINSTANCE hInstance, const Args &args) {
             state.H = nh;
             rebuildBitmapInfo(state);
             RECT r{0, 0, nw, nh};
-            AdjustWindowRectEx(&r, style, FALSE, exStyle);
+            AdjustWindowRectEx(&r, style, TRUE, exStyle);
             SetWindowPos(hwnd, nullptr, 0, 0,
                          r.right - r.left, r.bottom - r.top,
                          SWP_NOMOVE | SWP_NOZORDER);
@@ -427,6 +701,7 @@ int runWindowed(HINSTANCE hInstance, const Args &args) {
     }
 
     g_state = nullptr;
+    if (state.cursor) { DestroyCursor(state.cursor); state.cursor = nullptr; }
     if (IsWindow(hwnd)) DestroyWindow(hwnd);
     UnregisterClassW(wc.lpszClassName, hInstance);
     st80_shutdown();
@@ -438,6 +713,31 @@ int runWindowed(HINSTANCE hInstance, const Args &args) {
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
     Args args;
     if (int rc = parseArgs(args); rc != 0) return rc;
+
+    // Headless path is for CI / smoke tests only; never invoke UI.
     if (args.noWindow) return runHeadless(args);
-    return runWindowed(hInstance, args);
+
+    // If no image path was passed on the command line, run the
+    // launcher (matching app/apple-catalyst/ContentView.swift's
+    // ImageLibraryView path). Skip it when the user already
+    // launched an image previously and isn't holding Shift, so
+    // ordinary double-click-to-launch doesn't show the picker
+    // every time.
+    if (args.imagePath.empty()) {
+        const bool shiftHeld =
+            (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
+        if (!args.forceLauncher && !shiftHeld) {
+            std::string remembered = st80::LoadLastImage();
+            if (!remembered.empty()) args.imagePath = remembered;
+        }
+        if (args.imagePath.empty()) {
+            std::string picked;
+            if (!st80::ShowLauncher(hInstance, picked)) return 0;
+            args.imagePath = picked;
+        }
+    }
+
+    int rc = runWindowed(hInstance, args);
+    if (rc == 0) st80::RememberLastImage(args.imagePath);
+    return rc;
 }

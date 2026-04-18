@@ -12,7 +12,15 @@
 
 add_executable(st80-win WIN32
     st80_windows_main.cpp
+    Launcher.cpp
+    AboutDialog.cpp
+    Json.cpp
+    ${CMAKE_SOURCE_DIR}/tools/Sha256.cpp
     st80-win.rc
+)
+
+target_include_directories(st80-win PRIVATE
+    ${CMAKE_SOURCE_DIR}/tools
 )
 
 # Icon resource is separate so a fresh clone without the .ico file
@@ -36,6 +44,11 @@ target_link_libraries(st80-win PRIVATE
     user32
     shell32
     comdlg32
+    comctl32      # progress bar in launcher
+    shlwapi       # path helpers in launcher
+    advapi32      # registry I/O for last-launched image
+    ole32         # CoTaskMemFree for SHGetKnownFolderPath
+    winhttp       # download Xerox v2 from github releases
 )
 
 if(MSVC)
@@ -46,6 +59,10 @@ if(MSVC)
         WIN32_LEAN_AND_MEAN
         NOMINMAX
     )
+    # The .rc script already embeds our hand-written side-by-side
+    # manifest as resource `1 24`. Stop the linker from generating
+    # its own manifest or we get CVT1100 duplicate RT_MANIFEST.
+    target_link_options(st80-win PRIVATE /MANIFEST:NO)
 endif()
 
 install(TARGETS st80-win

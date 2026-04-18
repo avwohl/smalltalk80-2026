@@ -2,6 +2,170 @@
 
 User-visible changes. Most-recent build on top.
 
+## build 29 — 2026-04-18
+
+**Windows launcher: iospharo parity + SHA256-verified downloads.**
+
+The first-launch picker has been rewritten to mirror the
+iospharo launcher (`app/iospharo/iospharo/Views/ImageLibraryView.swift`)
+and moved off the registry-backed last-image model:
+
+  - **Sortable ListView** with Star / Name / Size / Last Modified
+    columns. Clicking a header toggles ascending/descending;
+    sort arrows render via `Header_SetItem` + `HDF_SORTUP/DOWN`.
+  - **Filter box** above the table, matching both the custom
+    display name and slug (case-insensitive via `StrStrIW`).
+  - **Detail panel** on the right with image name, file name,
+    slug, size, last-modified timestamp, and the on-disk path.
+  - **Action strip** (plus right-click context menu): Launch,
+    Rename..., Duplicate, Show in Explorer, Auto-Launch toggle,
+    Delete.
+  - **Auto-Launch star** replaces `HKCU\...\LastImagePath`. The
+    user explicitly stars an image; on next start the launcher
+    skips the window and boots straight into that image. The
+    legacy registry value is migrated to `library.json` once on
+    first run.
+
+New persistent state lives under
+`%USERPROFILE%\Documents\Smalltalk-80\`:
+
+  - `Images\<slug>\` — one subdirectory per image, holding the
+    `VirtualImage` (or `*.image`) plus optional companion
+    `Smalltalk-80.sources` / `Smalltalk-80.changes`.
+  - `library.json` — catalog of images (ids, custom names,
+    timestamps, auto-launch pointer).
+  - `manifest-cache.json` — last successful download manifest,
+    used if the network is unavailable.
+
+**Downloadable images are described by a manifest JSON** fetched
+from `https://raw.githubusercontent.com/avwohl/st80-images/main/manifest.json`
+(WinHTTP, redirect-follow enabled). Each asset in the manifest
+carries a `sha256` digest and a `size`. The launcher streams the
+download into a `Sha256` hasher and verifies the hex digest on
+completion; a mismatch deletes the file rather than leaving a
+tampered image on disk. A bundled fallback (Xerox v2) lets the
+download picker still open when the manifest fetch fails.
+
+"**Add from file...**" lets the user import an existing image
+plus its companion files into the library directly; a sibling
+`*.sources` / `*.changes` next to the selected `*.image` is
+picked up automatically.
+
+New files:
+
+  - `app/windows/Json.hpp` / `Json.cpp` — minimal recursive-descent
+    JSON reader/writer. No exceptions, no third-party headers;
+    error → null root.
+  - `packaging/st80-images-manifest.json` — sample manifest to
+    host at the URL above, with placeholder SHA256 values to be
+    filled in from `sha256sum` on the published release assets.
+
+## build 28 — 2026-04-18
+
+**Windows: menu bar with About, Edit → Paste, and focus-loss fix.**
+
+The pure-Win32 app now carries a standard menu bar:
+
+  - **File → Exit** — closes the window (Alt+F4 still works).
+  - **Edit → Copy Selection...** — shows an info dialog explaining
+    that OS-clipboard copy-out isn't wired up yet. Matches the
+    same limitation the Mac Catalyst frontend documents at
+    `app/apple-catalyst/St80MTKView.swift:461`: copy-out needs a
+    HAL primitive that touches the VM core.
+  - **Edit → Paste from Clipboard** (Ctrl+Shift+V) — reads
+    `CF_UNICODETEXT` from the clipboard and injects it as a
+    stream of `st80_post_key_down` events, clipping to printable
+    7-bit ASCII and translating LF→CR. Mirrors Mac Catalyst's
+    `pasteFromSystemClipboard()`. Ctrl+Shift+V is used instead of
+    plain Ctrl+V so the image's own Ctrl+V binding keeps working.
+  - **Help → About Smalltalk-80...** — TaskDialog with the same
+    content as `app/apple-catalyst/AboutView.swift` (project
+    link, references list, Blue Book footnote). Hyperlinks open
+    in the default browser via `ShellExecuteW`.
+
+Also: `WM_KILLFOCUS` now calls `ReleaseCapture` if the window
+held mouse capture when focus was lost. Previous behavior could
+leave the app mid-drag when the user alt-tabbed during a
+text-selection drag, and the next click on return wouldn't line
+up cleanly.
+
+New files:
+
+  - `app/windows/AboutDialog.hpp` / `AboutDialog.cpp` —
+    `TaskDialogIndirect`-backed About dialog. Ports the content
+    of `AboutView.swift` to a single Win32 modal with hyperlink
+    support. No dialog template resource needed.
+
+Modified:
+
+  - `app/windows/st80_windows_main.cpp` — menu bar built in code
+    via `CreateMenu`/`AppendMenuW`; `WM_COMMAND`, `WM_KILLFOCUS`,
+    and the Ctrl+Shift+V accelerator handled in `WndProc`.
+    `AdjustWindowRectEx` now passes `TRUE` for the menu flag so
+    the advertised client area still fits the full VM display
+    with the new menu bar attached.
+  - `app/windows/CMakeLists.txt` — adds `AboutDialog.cpp`.
+    `comctl32` was already linked for the launcher's progress
+    bar, which is where `TaskDialogIndirect` lives.
+
+## build 27 — 2026-04-18
+
+**Windows launcher: pick / download / import images on first run.**
+
+Mirrors the Mac/Catalyst `ImageLibraryView` flow on Windows. Running
+`st80-win.exe` with no image path now opens a launcher dialog
+instead of silently exiting (the old behaviour was a stderr-only
+usage message that nobody could see under /SUBSYSTEM:WINDOWS).
+
+Launcher capabilities:
+
+  - Lists every image found under
+    `%USERPROFILE%\Documents\Smalltalk-80\Images\<slug>\` (matches
+    the Mac `Documents/Images/<slug>/` layout).
+  - "Download Xerox v2" pulls VirtualImage + Smalltalk-80.sources
+    from the same GitHub release the Mac client uses
+    (`https://github.com/avwohl/st80-images/releases/download/xerox-v2/`),
+    via WinHTTP, with a progress bar.
+  - "Add from file…" opens GetOpenFileName, copies the chosen
+    file plus any sibling `.sources` / `.changes` files into the
+    library.
+  - "Delete" removes a library entry (with confirmation).
+
+Last-launched image path is persisted to
+`HKCU\Software\Aaron Wohl\st80-2026\LastImagePath`, so the second
+run skips the launcher and goes straight into the VM. Hold Shift
+at startup, or pass `--launcher`, to force the launcher back.
+
+CLI behaviour unchanged for scripts / CI: passing an image path on
+the command line bypasses the launcher entirely. `--no-window`
+still requires an explicit path (no UI to pick one in headless mode).
+
+Bug fixes folded in:
+
+  - `app/windows/CMakeLists.txt` now passes `/MANIFEST:NO` to the
+    linker. Our `.rc` already embeds a side-by-side manifest as
+    resource `1 24`; the MSVC linker was generating a second one
+    and the resource compiler failed with CVT1100 "duplicate
+    resource". Without this, the GUI exe never linked in Debug.
+
+New files:
+
+  - `app/windows/Launcher.hpp` — public API
+    (`ShowLauncher`, `RememberLastImage`, `LoadLastImage`).
+  - `app/windows/Launcher.cpp` — pure Win32 implementation. No
+    dialog template resource — controls are created with
+    `CreateWindowExW`. WinHTTP download runs on a worker thread
+    and posts progress back via custom `WM_APP_*` messages.
+
+Modified:
+
+  - `app/windows/st80_windows_main.cpp` — `WinMain` now picks
+    image path from CLI > remembered path > launcher, in that
+    order. Saves the path on clean exit. Usage MessageBox shown
+    when arguments are malformed (was silently dropped).
+  - `app/windows/CMakeLists.txt` — adds `Launcher.cpp` and
+    links `comctl32`, `shlwapi`, `advapi32`, `ole32`, `winhttp`.
+
 ## build 26 — 2026-04-17
 
 **Windows port (x64) — Phase 4 second target.**
@@ -117,9 +281,9 @@ Tools + tests changes:
     `enable_language(RC)` inside the `if(WIN32)` block brings
     resource compilation online.
 
-Build + package commands (x64, VS 2022):
+Build + package commands (x64, VS 2026):
 
-    cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+    cmake -S . -B build -G "Visual Studio 18 2026" -A x64
     cmake --build build --config Release --parallel
     cd build && ctest -C Release --output-on-failure
     cd build && cpack -G NSIS -C Release      # st80-0.1.0-Windows-AMD64.exe
@@ -128,15 +292,23 @@ Build + package commands (x64, VS 2022):
     powershell -ExecutionPolicy Bypass -File packaging/windows/pack-msix.ps1 `
         -Layout build/st80-0.1.0-appx -Output build/st80-0.1.0.msix
 
-Or the one-shot:
+Or the one-shot scripts at the repo root:
 
-    powershell -ExecutionPolicy Bypass `
-        -File packaging/windows/build-release.ps1 -Arch x64
+    build.bat                 REM Debug configure + build
+    build_release.bat         REM Release + NSIS + WIX + MSIX
+    build_release.bat -Arch ARM64
 
-ARM64 is reachable by passing `-A ARM64` to the configure step —
-the Windows slice is architecture-agnostic and doesn't touch the
-JIT (Phase 6). A separate pass will wire the ARM64 CI job once
-the Phase-6 JIT backend needs it.
+`build_release.bat` delegates to `packaging\windows\build-release.ps1`,
+which auto-detects whether Visual Studio 2026 (install root
+`C:\Program Files\Microsoft Visual Studio\18`) is present and falls
+back to `"Visual Studio 17 2022"` if not. The VS 2026 toolset is
+`v145`; CMake picks it implicitly from the generator.
+
+ARM64 is reachable by passing `-Arch ARM64` to `build_release.bat`
+(or `-A ARM64` to the raw `cmake -G` invocation) — the Windows
+slice is architecture-agnostic and doesn't touch the JIT (Phase 6).
+A separate pass will wire the ARM64 CI job once the Phase-6 JIT
+backend needs it.
 
 ## build 25 — 2026-04-17
 

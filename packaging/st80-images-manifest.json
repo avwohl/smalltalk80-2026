@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-04-18",
+  "comment": "Sample manifest for the st80-images repo. Host this file at https://raw.githubusercontent.com/avwohl/st80-images/main/manifest.json (see kManifestHost / kManifestPath in app/windows/Launcher.cpp). Each asset carries a SHA256 digest; the launcher verifies after download and deletes the file on mismatch. Replace the placeholder sha256 values with the actual `sha256sum` of the release assets before publishing.",
+  "images": [
+    {
+      "id": "xerox-v2",
+      "label": "Xerox Smalltalk-80 v2 (Wolczko)",
+      "slug": "xerox-v2",
+      "imageFileName": "VirtualImage",
+      "description": "The 1983 Xerox Blue Book virtual image as prepared by Mario Wolczko. Original source: https://github.com/dbanay/Smalltalk.",
+      "assets": [
+        {
+          "name": "VirtualImage",
+          "url": "https://github.com/avwohl/st80-images/releases/download/v2/VirtualImage",
+          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "size": 0
+        },
+        {
+          "name": "Smalltalk-80.sources",
+          "url": "https://github.com/avwohl/st80-images/releases/download/v2/Smalltalk-80.sources",
+          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "size": 0
+        },
+        {
+          "name": "Smalltalk-80.changes",
+          "url": "https://github.com/avwohl/st80-images/releases/download/v2/Smalltalk-80.changes",
+          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "size": 0
+        }
+      ]
+    }
+  ]
+}
