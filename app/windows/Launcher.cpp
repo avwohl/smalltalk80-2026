@@ -76,18 +76,21 @@ namespace {
 // IDs / messages / constants
 // ----------------------------------------------------------------------------
 
-constexpr int ID_LIST         = 1001;
-constexpr int ID_LAUNCH       = 1002;
-constexpr int ID_DOWNLOAD     = 1003;
-constexpr int ID_ADD_FILE     = 1004;
-constexpr int ID_DELETE       = 1005;
-constexpr int ID_CANCEL       = 1006;
-constexpr int ID_RENAME       = 1007;
-constexpr int ID_DUPLICATE    = 1008;
-constexpr int ID_SHOW_FOLDER  = 1009;
-constexpr int ID_AUTO_LAUNCH  = 1010;
-constexpr int ID_FILTER_EDIT  = 1011;
-constexpr int ID_CONTEXT_BASE = 1100;   // popup menu IDs
+constexpr int ID_LIST          = 1001;
+constexpr int ID_LAUNCH        = 1002;
+constexpr int ID_DOWNLOAD      = 1003;
+constexpr int ID_ADD_FILE      = 1004;
+constexpr int ID_DELETE        = 1005;
+constexpr int ID_CANCEL        = 1006;
+constexpr int ID_RENAME        = 1007;
+constexpr int ID_DUPLICATE     = 1008;
+constexpr int ID_SHOW_FOLDER   = 1009;
+constexpr int ID_AUTO_LAUNCH   = 1010;
+constexpr int ID_FILTER_EDIT   = 1011;
+constexpr int ID_FILTER_CLEAR  = 1012;
+constexpr int ID_DOWNLOAD_URL  = 1013;
+constexpr int ID_SETTINGS      = 1014;
+constexpr int ID_CONTEXT_BASE  = 1100;   // popup menu IDs
 
 // WPARAM = 0..100 percent, LPARAM = 0
 constexpr UINT WM_APP_DL_PROGRESS = WM_APP + 1;
@@ -762,6 +765,12 @@ struct DownloadJob {
     std::vector<Asset> assets;
 };
 
+// Set by the UI thread when the user clicks "Cancel Download" while a
+// transfer is in flight. The worker thread polls it inside the read
+// loop. Plain volatile is fine for the LONG word reads/writes the
+// loop performs; nothing depends on memory ordering here.
+volatile LONG g_downloadCancelRequested = 0;
+
 // Report cumulative 0..100 progress to the UI thread.
 void postProgress(HWND hwnd, int percent) {
     if (percent < 0)   percent = 0;
@@ -822,6 +831,9 @@ std::string downloadAsset(HINTERNET hSession, const Url &u,
     bool success = true;
     unsigned char chunk[16 * 1024];
     for (;;) {
+        if (InterlockedCompareExchange(&g_downloadCancelRequested, 0, 0)) {
+            success = false; break;
+        }
         DWORD avail = 0;
         if (!WinHttpQueryDataAvailable(hReq, &avail)) { success = false; break; }
         if (avail == 0) break;
@@ -900,7 +912,12 @@ DWORD WINAPI downloadThreadProc(LPVOID raw) {
                                            static_cast<int>(job->assets.size()));
         if (digest.empty()) {
             ok = false;
-            failMsg = L"Download failed for " + a.fileName;
+            if (InterlockedCompareExchange(&g_downloadCancelRequested,
+                                            0, 0)) {
+                failMsg = L"Download cancelled.";
+            } else {
+                failMsg = L"Download failed for " + a.fileName;
+            }
             break;
         }
         if (!a.sha256.empty() && a.sha256 != digest) {
@@ -1232,6 +1249,242 @@ int showDownloadPicker(HWND owner, const Manifest &m) {
 }
 
 // ----------------------------------------------------------------------------
+// Auto-launch splash dialog
+// ----------------------------------------------------------------------------
+//
+// Mirrors AutoLaunchSplashView on Catalyst. Presents the user with a
+// 3-second countdown ("Launching <name> in 3…") and a "Show Library"
+// button so a damaged starred image can't lock them out. The window
+// owns a 1-second WM_TIMER; the proc decrements `countdown` each
+// tick and posts WM_CLOSE when it hits zero.
+
+struct AutoLaunchSplashState {
+    HWND  hwnd      = nullptr;
+    HWND  hCountLbl = nullptr;
+    int   countdown = 3;
+    bool  proceed   = false;   // true => launch; false => show library
+    bool  done      = false;
+    UINT  timerId   = 0;
+};
+
+constexpr UINT_PTR kSplashTimerId   = 0xA110;
+constexpr int      ID_SPLASH_LIB    = 9301;
+
+LRESULT CALLBACK autoLaunchSplashProc(HWND hwnd, UINT msg,
+                                      WPARAM wp, LPARAM lp) {
+    AutoLaunchSplashState *st = reinterpret_cast<AutoLaunchSplashState *>(
+        GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+    switch (msg) {
+        case WM_CREATE: {
+            CREATESTRUCTW *cs = reinterpret_cast<CREATESTRUCTW *>(lp);
+            SetWindowLongPtrW(hwnd, GWLP_USERDATA,
+                              reinterpret_cast<LONG_PTR>(cs->lpCreateParams));
+            return 0;
+        }
+        case WM_TIMER:
+            if (st && wp == kSplashTimerId) {
+                if (st->countdown > 1) {
+                    st->countdown -= 1;
+                    wchar_t buf[8];
+                    std::swprintf(buf, 8, L"%d", st->countdown);
+                    SetWindowTextW(st->hCountLbl, buf);
+                } else {
+                    st->proceed = true;
+                    st->done    = true;
+                    PostQuitMessage(0);
+                }
+            }
+            return 0;
+        case WM_COMMAND:
+            if (st && LOWORD(wp) == ID_SPLASH_LIB) {
+                st->proceed = false;
+                st->done    = true;
+                PostQuitMessage(0);
+                return 0;
+            }
+            break;
+        case WM_CLOSE:
+            if (st) { st->proceed = false; st->done = true; }
+            PostQuitMessage(0);
+            return 0;
+    }
+    return DefWindowProcW(hwnd, msg, wp, lp);
+}
+
+bool runAutoLaunchSplash(HINSTANCE hInst, const std::wstring &displayName) {
+    static bool registered = false;
+    if (!registered) {
+        WNDCLASSEXW wc{};
+        wc.cbSize        = sizeof(wc);
+        wc.style         = CS_HREDRAW | CS_VREDRAW;
+        wc.lpfnWndProc   = autoLaunchSplashProc;
+        wc.hInstance     = hInst;
+        wc.hCursor       = LoadCursorW(nullptr, IDC_ARROW);
+        wc.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_BTNFACE + 1);
+        wc.lpszClassName = L"St80AutoLaunchSplash";
+        wc.hIcon         = LoadIconW(hInst, MAKEINTRESOURCEW(1));
+        wc.hIconSm       = wc.hIcon;
+        if (!RegisterClassExW(&wc)) return true;  // fail open: just launch
+        registered = true;
+    }
+
+    UINT dpi = GetDpiForSystem();
+    auto S = [dpi](int v) { return MulDiv(v, dpi, 96); };
+
+    const int cw = 420, ch = 260;
+    RECT rc{0, 0, S(cw), S(ch)};
+    AdjustWindowRectExForDpi(&rc,
+        WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU, FALSE, 0, dpi);
+    const int outW = rc.right - rc.left;
+    const int outH = rc.bottom - rc.top;
+
+    HMONITOR hmon = MonitorFromPoint({0, 0}, MONITOR_DEFAULTTOPRIMARY);
+    MONITORINFO mi{};
+    mi.cbSize = sizeof(mi);
+    GetMonitorInfoW(hmon, &mi);
+    const int x = mi.rcWork.left +
+                  ((mi.rcWork.right  - mi.rcWork.left) - outW) / 2;
+    const int y = mi.rcWork.top +
+                  ((mi.rcWork.bottom - mi.rcWork.top) - outH) / 2;
+
+    AutoLaunchSplashState st;
+    HWND hwnd = CreateWindowExW(WS_EX_DLGMODALFRAME,
+        L"St80AutoLaunchSplash", L"Smalltalk-80",
+        WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU,
+        x, y, outW, outH, nullptr, nullptr, hInst, &st);
+    if (!hwnd) return true;
+    st.hwnd = hwnd;
+
+    NONCLIENTMETRICSW ncm{};
+    ncm.cbSize = sizeof(ncm);
+    SystemParametersInfoForDpi(SPI_GETNONCLIENTMETRICS,
+                               sizeof(ncm), &ncm, 0, dpi);
+    HFONT hFont = CreateFontIndirectW(&ncm.lfMessageFont);
+    LOGFONTW big = ncm.lfMessageFont;
+    big.lfHeight = static_cast<LONG>(big.lfHeight * 30 / 10);
+    big.lfWeight = FW_BOLD;
+    HFONT hBig = CreateFontIndirectW(&big);
+    LOGFONTW mid = ncm.lfMessageFont;
+    mid.lfHeight = static_cast<LONG>(mid.lfHeight * 14 / 10);
+    mid.lfWeight = FW_BOLD;
+    HFONT hMid = CreateFontIndirectW(&mid);
+
+    auto mk = [&](const wchar_t *cls, const wchar_t *text, DWORD style,
+                  int lx, int ly, int lw, int lh, int id, HFONT font) {
+        HWND c = CreateWindowExW(0, cls, text,
+            WS_CHILD | WS_VISIBLE | style,
+            S(lx), S(ly), S(lw), S(lh), hwnd,
+            reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)),
+            hInst, nullptr);
+        SendMessageW(c, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
+        return c;
+    };
+
+    mk(L"STATIC", L"Auto-launching", SS_CENTER,
+       16, 22, cw - 32, 28, 9311, hMid);
+    mk(L"STATIC", displayName.c_str(), SS_CENTER,
+       16, 56, cw - 32, 22, 9312, hFont);
+    st.hCountLbl = mk(L"STATIC", L"3", SS_CENTER,
+       16, 92, cw - 32, 60, 9313, hBig);
+    mk(L"BUTTON", L"Show Library", BS_PUSHBUTTON,
+       cw / 2 - 90, 178, 180, 36, ID_SPLASH_LIB, hFont);
+
+    SetTimer(hwnd, kSplashTimerId, 1000, nullptr);
+    ShowWindow(hwnd, SW_SHOW);
+    UpdateWindow(hwnd);
+    SetForegroundWindow(hwnd);
+
+    MSG msg;
+    while (!st.done && GetMessageW(&msg, nullptr, 0, 0) > 0) {
+        if (msg.message == WM_KEYDOWN && msg.wParam == VK_ESCAPE) {
+            st.proceed = false; st.done = true; break;
+        }
+        if (!IsDialogMessageW(hwnd, &msg)) {
+            TranslateMessage(&msg);
+            DispatchMessageW(&msg);
+        }
+    }
+
+    KillTimer(hwnd, kSplashTimerId);
+    DestroyWindow(hwnd);
+    DeleteObject(hFont);
+    DeleteObject(hMid);
+    DeleteObject(hBig);
+    return st.proceed;
+}
+
+// ----------------------------------------------------------------------------
+// Settings / About dialog
+// ----------------------------------------------------------------------------
+//
+// Mirrors SettingsView + AboutView on Catalyst. Implemented as a
+// TaskDialogIndirect so we get hyperlink-aware rich text without a
+// .rc dialog template. Reuses the AboutDialog approach but adds
+// version + bug + changes + acknowledgements links.
+
+HRESULT CALLBACK settingsDialogCallback(HWND hwnd, UINT msg,
+                                       WPARAM /*wp*/, LPARAM lp,
+                                       LONG_PTR /*refData*/) {
+    if (msg == TDN_HYPERLINK_CLICKED) {
+        const wchar_t *url = reinterpret_cast<const wchar_t *>(lp);
+        if (url && *url) {
+            ShellExecuteW(hwnd, L"open", url, nullptr, nullptr,
+                          SW_SHOWNORMAL);
+        }
+    }
+    return S_OK;
+}
+
+void runSettingsDialog(HWND owner) {
+    static const wchar_t kTitle[]   = L"Smalltalk-80 — Settings";
+    static const wchar_t kHeader[]  = L"Smalltalk-80";
+    static const wchar_t kContent[] =
+        L"Blue Book VM, 1983 Xerox virtual image.\n"
+        L"\n"
+        L"<b>Project</b>\n"
+        L"<a href=\"https://github.com/avwohl/smalltalk80-2026\">"
+        L"avwohl/smalltalk80-2026</a> on GitHub.\n"
+        L"\n"
+        L"<a href=\"https://github.com/avwohl/smalltalk80-2026/issues\">"
+        L"Report a bug</a>\n"
+        L"<a href=\"https://github.com/avwohl/smalltalk80-2026/blob/main/docs/changes.md\">"
+        L"Changes / release notes</a>\n"
+        L"\n"
+        L"<b>Acknowledgements</b>\n"
+        L"<a href=\"https://github.com/dbanay/Smalltalk\">dbanay/Smalltalk</a>"
+        L" — MIT; primary C++ port source for object memory, BitBlt,"
+        L" interpreter dispatch, and primitives.\n"
+        L"\n"
+        L"<a href=\"http://www.wolczko.com/st80/\">Xerox v2 image</a>"
+        L" — Wolczko's distribution of the 1983 Xerox virtual image."
+        L" Mirrored at <a href=\"https://github.com/avwohl/st80-images\">"
+        L"avwohl/st80-images</a>.\n"
+        L"\n"
+        L"<a href=\"https://github.com/iriyak/Smalltalk\">iriyak/Smalltalk</a>"
+        L" — additional reference Blue Book VM consulted during"
+        L" development.\n"
+        L"\n"
+        L"Implements the Smalltalk-80 virtual machine as specified in"
+        L" Goldberg \x0026 Robson, \x201CSmalltalk-80: The Language"
+        L" and its Implementation\x201D (Addison-Wesley, 1983),"
+        L" chapters 26\x2013" L"30.";
+
+    TASKDIALOGCONFIG cfg{};
+    cfg.cbSize             = sizeof(cfg);
+    cfg.hwndParent         = owner;
+    cfg.dwFlags            = TDF_ENABLE_HYPERLINKS |
+                             TDF_ALLOW_DIALOG_CANCELLATION |
+                             TDF_SIZE_TO_CONTENT;
+    cfg.dwCommonButtons    = TDCBF_CLOSE_BUTTON;
+    cfg.pszWindowTitle     = kTitle;
+    cfg.pszMainInstruction = kHeader;
+    cfg.pszContent         = kContent;
+    cfg.pfCallback         = settingsDialogCallback;
+
+    TaskDialogIndirect(&cfg, nullptr, nullptr, nullptr);
+}
+
+// ----------------------------------------------------------------------------
 // Formatting helpers
 // ----------------------------------------------------------------------------
 
@@ -1294,8 +1547,11 @@ struct LauncherState {
     HWND hDeleteBtn   = nullptr;
 
     HWND hDownloadBtn = nullptr;
+    HWND hDownloadUrlBtn = nullptr;
     HWND hAddBtn      = nullptr;
     HWND hCancelBtn   = nullptr;
+    HWND hSettingsBtn = nullptr;
+    HWND hFilterClear = nullptr;
 
     HWND hDetName     = nullptr;
     HWND hDetPath     = nullptr;
@@ -1485,6 +1741,11 @@ void updateDetailPanel(LauncherState &st) {
     EnableWindow(st.hShowBtn,    any && !st.downloading);
     EnableWindow(st.hStarBtn,    any && !st.downloading);
     EnableWindow(st.hDeleteBtn,  any && !st.downloading);
+    // Repurpose the bottom Cancel button while a download is in
+    // flight: it cancels the transfer instead of closing the
+    // launcher.
+    SetWindowTextW(st.hCancelBtn,
+        st.downloading ? L"Cancel Download" : L"Cancel");
     if (any) {
         const auto &e = st.lib.images[idx];
         const bool starred = !st.lib.autoLaunchId.empty() &&
@@ -1765,13 +2026,15 @@ void startDownloadFromManifest(LauncherState &st, const ManifestImage &img) {
     saveLibraryJson(st.lib);
 
     DownloadJob *raw = job.release();
+    InterlockedExchange(&g_downloadCancelRequested, 0);
     HANDLE th = CreateThread(nullptr, 0, downloadThreadProc, raw, 0, nullptr);
     if (!th) { delete raw; setStatus(st, L"Could not start download."); return; }
     st.dlThread    = th;
     st.downloading = true;
 
-    EnableWindow(st.hDownloadBtn, FALSE);
-    EnableWindow(st.hAddBtn,      FALSE);
+    EnableWindow(st.hDownloadBtn,    FALSE);
+    EnableWindow(st.hDownloadUrlBtn, FALSE);
+    EnableWindow(st.hAddBtn,         FALSE);
     updateDetailPanel(st);
     SendMessageW(st.hProgress, PBM_SETPOS, 0, 0);
     ShowWindow(st.hProgress, SW_SHOW);
@@ -1794,6 +2057,55 @@ void onDownload(LauncherState &st) {
     startDownloadFromManifest(st, st.manifest.images[pick]);
 }
 
+// Mirrors the "Custom URL" path in iospharo's NewImageView: prompt
+// the user for a direct download URL, infer a slug + file name from
+// the URL's last path segment, and kick off a single-asset job.
+// Companion sources/changes have to be added separately via the
+// "Add from file…" path.
+void onDownloadCustomURL(LauncherState &st) {
+    if (st.downloading) return;
+    std::wstring url;
+    if (!promptForText(st.hwnd, L"Download from URL",
+                       L"Direct URL of an image file:",
+                       L"https://", url)) return;
+    while (!url.empty() &&
+           (url.back() == L' ' || url.back() == L'\t'))
+        url.pop_back();
+    while (!url.empty() &&
+           (url.front() == L' ' || url.front() == L'\t'))
+        url.erase(url.begin());
+    if (url.empty() || url == L"https://") return;
+
+    Url parsed = parseUrl(url);
+    if (parsed.host.empty()) {
+        setStatus(st, L"That URL is not valid.");
+        return;
+    }
+
+    // Derive the file name from the URL's last path segment.
+    std::wstring fileName = parsed.path;
+    auto slash = fileName.find_last_of(L'/');
+    if (slash != std::wstring::npos) fileName = fileName.substr(slash + 1);
+    auto query = fileName.find(L'?');
+    if (query != std::wstring::npos) fileName = fileName.substr(0, query);
+    if (fileName.empty()) fileName = L"VirtualImage";
+    std::wstring base = fileName;
+    auto dot = base.find_last_of(L'.');
+    if (dot != std::wstring::npos) base = base.substr(0, dot);
+    if (base.empty()) base = L"image";
+
+    ManifestImage img;
+    img.slug          = makeSlug(base);
+    img.label         = base;
+    img.imageFileName = fileName;
+    ManifestAsset a;
+    a.url    = url;
+    a.name   = fileName;
+    img.assets.push_back(std::move(a));
+
+    startDownloadFromManifest(st, img);
+}
+
 void onDownloadDone(LauncherState &st, WPARAM ok, LPARAM lp) {
     std::unique_ptr<wchar_t[]> heap(reinterpret_cast<wchar_t *>(lp));
     if (st.dlThread) {
@@ -1802,9 +2114,12 @@ void onDownloadDone(LauncherState &st, WPARAM ok, LPARAM lp) {
         st.dlThread = nullptr;
     }
     st.downloading = false;
+    InterlockedExchange(&g_downloadCancelRequested, 0);
     ShowWindow(st.hProgress, SW_HIDE);
-    EnableWindow(st.hDownloadBtn, TRUE);
-    EnableWindow(st.hAddBtn,      TRUE);
+    EnableWindow(st.hDownloadBtn,    TRUE);
+    EnableWindow(st.hDownloadUrlBtn, TRUE);
+    EnableWindow(st.hAddBtn,         TRUE);
+    SetWindowTextW(st.hCancelBtn, L"Cancel");
 
     if (ok == 0 && heap) {
         refreshAll(st);
@@ -1852,16 +2167,33 @@ LRESULT CALLBACK LauncherWndProc(HWND hwnd, UINT msg,
                 case ID_AUTO_LAUNCH:  onToggleStar(*st); return 0;
                 case ID_DELETE:       onDelete(*st);     return 0;
                 case ID_DOWNLOAD:     onDownload(*st);   return 0;
+                case ID_DOWNLOAD_URL: onDownloadCustomURL(*st); return 0;
                 case ID_ADD_FILE:     onAddFile(*st);    return 0;
+                case ID_SETTINGS:     runSettingsDialog(st->hwnd); return 0;
                 case ID_CANCEL:
-                    st->finished = false;
-                    PostQuitMessage(0);
+                    if (st->downloading) {
+                        InterlockedExchange(
+                            &g_downloadCancelRequested, 1);
+                        setStatus(*st, L"Cancelling download…");
+                    } else {
+                        st->finished = false;
+                        PostQuitMessage(0);
+                    }
+                    return 0;
+                case ID_FILTER_CLEAR:
+                    SetWindowTextW(st->hFilter, L"");
+                    st->filter.clear();
+                    populateListView(*st);
+                    updateDetailPanel(*st);
+                    SetFocus(st->hFilter);
                     return 0;
                 case ID_FILTER_EDIT:
                     if (code == EN_CHANGE) {
                         wchar_t buf[256] = {};
                         GetWindowTextW(st->hFilter, buf, 256);
                         st->filter = buf;
+                        ShowWindow(st->hFilterClear,
+                                   st->filter.empty() ? SW_HIDE : SW_SHOW);
                         populateListView(*st);
                         updateDetailPanel(*st);
                     }
@@ -1924,7 +2256,14 @@ LRESULT CALLBACK LauncherWndProc(HWND hwnd, UINT msg,
             if (st) onDownloadDone(*st, wp, lp);
             return 0;
         case WM_CLOSE:
-            if (st) st->finished = false;
+            if (st) {
+                st->finished = false;
+                if (st->downloading) {
+                    // Tell the worker to stop so the cleanup
+                    // WaitForSingleObject doesn't burn its 5s timeout.
+                    InterlockedExchange(&g_downloadCancelRequested, 1);
+                }
+            }
             PostQuitMessage(0);
             return 0;
         case WM_DESTROY:
@@ -1975,15 +2314,25 @@ void buildControls(LauncherState &st, HWND hwnd, UINT dpi) {
        M, Layout::kFilterY + 3, 50, Layout::kFilterH - 4, 9003, st.hFont);
     st.hFilter = mk(L"EDIT", L"",
        ES_AUTOHSCROLL | WS_BORDER,
-       M + 54, Layout::kFilterY, 300, Layout::kFilterH,
+       M + 54, Layout::kFilterY, 270, Layout::kFilterH,
        ID_FILTER_EDIT, st.hFont);
+    // Tiny clear-X next to the filter, mirroring the SwiftUI
+    // launcher's xmark.circle.fill button. Hidden when the field is
+    // empty. We toggle visibility from the EN_CHANGE handler via
+    // ShowWindow().
+    st.hFilterClear = mk(L"BUTTON", L"\u2715", BS_PUSHBUTTON,
+       M + 54 + 274, Layout::kFilterY, 24, Layout::kFilterH,
+       ID_FILTER_CLEAR, st.hFont);
 
     st.hDownloadBtn = mk(L"BUTTON", L"Download…", BS_PUSHBUTTON,
-       Layout::kClientW - M - 260, Layout::kFilterY - 3,
-       125, Layout::kFilterH + 6, ID_DOWNLOAD, st.hFont);
+       Layout::kClientW - M - 380, Layout::kFilterY - 3,
+       110, Layout::kFilterH + 6, ID_DOWNLOAD, st.hFont);
+    st.hDownloadUrlBtn = mk(L"BUTTON", L"From URL…", BS_PUSHBUTTON,
+       Layout::kClientW - M - 265, Layout::kFilterY - 3,
+       110, Layout::kFilterH + 6, ID_DOWNLOAD_URL, st.hFont);
     st.hAddBtn = mk(L"BUTTON", L"Add from file…", BS_PUSHBUTTON,
-       Layout::kClientW - M - 130, Layout::kFilterY - 3,
-       130, Layout::kFilterH + 6, ID_ADD_FILE, st.hFont);
+       Layout::kClientW - M - 150, Layout::kFilterY - 3,
+       150, Layout::kFilterH + 6, ID_ADD_FILE, st.hFont);
 
     // ListView.
     st.hList = CreateWindowExW(WS_EX_CLIENTEDGE, WC_LISTVIEWW, L"",
@@ -2046,10 +2395,19 @@ void buildControls(LauncherState &st, HWND hwnd, UINT dpi) {
     st.hStatus = mk(L"STATIC", L"", SS_LEFT,
         M, Layout::kStatusY, CW, Layout::kStatusH, 9202, st.hFont);
 
-    // Bottom-right: Cancel.
+    // Bottom-left: Settings (mirrors the gear button on Catalyst).
+    st.hSettingsBtn = mk(L"BUTTON", L"Settings…", BS_PUSHBUTTON,
+        M, Layout::kBottomY,
+        110, Layout::kBottomH, ID_SETTINGS, st.hFont);
+
+    // Bottom-right: Cancel. The button text becomes "Cancel
+    // Download" while a transfer is running (see updateDetailPanel).
     st.hCancelBtn = mk(L"BUTTON", L"Cancel", BS_PUSHBUTTON,
-        Layout::kClientW - M - 100, Layout::kBottomY,
-        100, Layout::kBottomH, ID_CANCEL, st.hFont);
+        Layout::kClientW - M - 130, Layout::kBottomY,
+        130, Layout::kBottomH, ID_CANCEL, st.hFont);
+
+    // Clear-X starts hidden (filter is empty on launch).
+    ShowWindow(st.hFilterClear, SW_HIDE);
 }
 
 }  // namespace
@@ -2124,6 +2482,14 @@ bool ShowLauncher(HINSTANCE hInstance, std::string &outImagePath) {
     MSG msg;
     while (GetMessageW(&msg, nullptr, 0, 0) > 0) {
         if (msg.message == WM_KEYDOWN && msg.wParam == VK_ESCAPE) {
+            if (st.downloading) {
+                // ESC during a download cancels the transfer rather
+                // than dismissing the launcher — matches the bottom
+                // Cancel button's behaviour.
+                InterlockedExchange(&g_downloadCancelRequested, 1);
+                setStatus(st, L"Cancelling download…");
+                continue;
+            }
             st.finished = false;
             PostQuitMessage(0);
             continue;
@@ -2135,6 +2501,7 @@ bool ShowLauncher(HINSTANCE hInstance, std::string &outImagePath) {
     }
 
     if (st.dlThread) {
+        InterlockedExchange(&g_downloadCancelRequested, 1);
         WaitForSingleObject(st.dlThread, 5000);
         CloseHandle(st.dlThread);
     }
@@ -2175,16 +2542,32 @@ void RememberLastImage(const std::string &imagePath) {
     saveLibraryJson(lib);
 }
 
+bool ShowAutoLaunchSplash(HINSTANCE hInstance,
+                          const std::string &imagePath,
+                          const std::string &displayName) {
+    (void)imagePath;
+    std::wstring shown = utf8to16(displayName);
+    if (shown.empty()) shown = L"image";
+    return runAutoLaunchSplash(hInstance, shown);
+}
+
+void ShowSettingsDialog(HWND owner) {
+    runSettingsDialog(owner);
+}
+
 std::string LoadLastImage() {
-    // Return the full path of the explicitly-starred auto-launch
-    // image, or empty if none is set (or the starred image no longer
-    // exists on disk). This is what the main.cpp skip-launcher path
-    // consults.
+    std::string ignored;
+    return LoadAutoLaunchInfo(ignored);
+}
+
+std::string LoadAutoLaunchInfo(std::string &outDisplayName) {
+    outDisplayName.clear();
     Library lib = reconcileWithFilesystem(loadLibraryJson());
     if (lib.autoLaunchId.empty()) return {};
     for (const auto &e : lib.images) {
         if (e.id == lib.autoLaunchId && !e.fullImagePath.empty() &&
             fileExistsW(e.fullImagePath)) {
+            outDisplayName = utf16to8(e.name);
             return utf16to8(e.fullImagePath);
         }
     }

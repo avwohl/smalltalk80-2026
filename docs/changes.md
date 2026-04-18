@@ -4,6 +4,37 @@ User-visible changes. Most-recent build on top.
 
 ## build 31 — 2026-04-18
 
+**Windows launcher catches up to Catalyst / iospharo parity.**
+
+  - **Custom URL download** — new "From URL…" button between
+    "Download…" and "Add from file…". Prompts for a direct download
+    URL, infers a slug + filename from the URL's last path segment,
+    and runs the same single-asset job pipeline as a manifest
+    download (no SHA256 since the URL didn't come from the manifest).
+  - **Cancel a download mid-transfer** — the bottom Cancel button
+    becomes "Cancel Download" while a transfer is running. Pressing
+    it (or ESC, or closing the launcher window) sets a cancel flag
+    that the WinHTTP read loop checks at every 16 KB chunk; the
+    half-downloaded file is removed and the status line shows
+    "Download cancelled."
+  - **Clear-X next to the filter** — small × button beside the
+    filter edit, hidden when the field is empty.
+  - **Settings dialog** — new "Settings…" button (bottom-left)
+    opens a TaskDialog with VM project, bug-report, changes, and
+    acknowledgements links. Mirrors SettingsView on Catalyst.
+  - **Auto-launch splash** — when a starred image triggers the
+    skip-the-picker path, the app now shows a 3-second countdown
+    with a "Show Library" button before booting the VM. Identical
+    semantics to AutoLaunchSplashView on Catalyst, so a damaged
+    starred image no longer locks the user out of the picker.
+
+New public API in `Launcher.hpp`:
+
+  - `bool ShowAutoLaunchSplash(HINSTANCE, const std::string &path,
+    const std::string &displayName);`
+  - `std::string LoadAutoLaunchInfo(std::string &outDisplayName);`
+  - `void ShowSettingsDialog(HWND owner);`
+
 **Catalyst launcher: Pharo-Launcher-style picker.** The iOS / Mac
 Catalyst image picker is rewritten to match the launcher in the
 companion `iospharo` project (https://github.com/avwohl/iospharo).

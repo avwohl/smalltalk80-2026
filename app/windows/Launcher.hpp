@@ -49,4 +49,26 @@ void RememberLastImage(const std::string &imagePath);
 // or empty if none is starred (or the starred image is missing).
 std::string LoadLastImage();
 
+// Same as LoadLastImage, but also returns the catalog display name in
+// `outDisplayName`. Useful for the auto-launch splash so it can show
+// the user-chosen name rather than just the filename.
+std::string LoadAutoLaunchInfo(std::string &outDisplayName);
+
+// 3-second countdown splash shown before auto-launching a starred
+// image. Mirrors AutoLaunchSplashView on Catalyst — gives the user an
+// escape hatch ("Show Library") so a damaged starred image can't
+// lock them out. Returns true if the countdown finished and the
+// caller should proceed with launching `imagePath`; false if the
+// user clicked "Show Library", in which case the caller should
+// fall through to ShowLauncher().
+bool ShowAutoLaunchSplash(HINSTANCE hInstance,
+                          const std::string &imagePath,
+                          const std::string &displayName);
+
+// Settings / About dialog. Mirrors SettingsView + AboutView on
+// Catalyst — VM version, project link, bug-report link, changes link,
+// and the references / acknowledgements list. Modal; blocks until
+// the user clicks Close.
+void ShowSettingsDialog(HWND owner);
+
 }  // namespace st80

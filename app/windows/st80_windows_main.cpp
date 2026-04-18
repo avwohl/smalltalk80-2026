@@ -727,8 +727,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
         const bool shiftHeld =
             (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
         if (!args.forceLauncher && !shiftHeld) {
-            std::string remembered = st80::LoadLastImage();
-            if (!remembered.empty()) args.imagePath = remembered;
+            std::string displayName;
+            std::string remembered = st80::LoadAutoLaunchInfo(displayName);
+            if (!remembered.empty()) {
+                // 3-second countdown with a "Show Library" escape
+                // hatch so a damaged starred image doesn't lock the
+                // user out. Mirrors AutoLaunchSplashView on Catalyst.
+                if (st80::ShowAutoLaunchSplash(hInstance, remembered,
+                                               displayName)) {
+                    args.imagePath = remembered;
+                }
+            }
         }
         if (args.imagePath.empty()) {
             std::string picked;
