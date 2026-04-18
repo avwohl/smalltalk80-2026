@@ -1,19 +1,23 @@
 // st80-2026 — ImageManager.swift (Catalyst / iOS)
 // Copyright (c) 2026 Aaron Wohl. MIT License.
 //
-// Downloads and catalogs Smalltalk-80 image files inside
-// Documents/Images/. The asset host is
+// Downloads, imports, renames, duplicates, and catalogs Smalltalk-80
+// images inside Documents/Images/<slug>/. The catalog is persisted to
+// Documents/image-library.json.
+//
+// Built-in templates pull individual files from
 //
 //     https://github.com/avwohl/st80-images/releases/download/<tag>/
 //
 // — a public companion repo that mirrors Wolczko's Xerox v2
-// distribution. Individual files (VirtualImage, Smalltalk-80.sources,
-// trace2, trace3) are served as release assets, so we can GET each
-// one directly via URLSession with no archive extraction.
+// distribution. Each file is fetched directly via URLSession; no
+// archive extraction is needed (unlike iospharo's Pharo zips).
 //
-// Modelled on ../iospharo/iospharo/Image/ImageManager.swift but
-// trimmed to what Phase 2 actually needs: one built-in template,
-// download-to-Documents, simple catalog persisted as JSON.
+// Custom-URL downloads accept any direct download link to a single
+// image file; companion sources/changes have to be imported separately
+// via "Add image from file…".
+//
+// Adapted from ../iospharo/iospharo/Image/ImageManager.swift.
 
 import Foundation
 import Combine
@@ -28,10 +32,10 @@ final class ImageManager: ObservableObject {
     struct Template: Identifiable {
         let id: String
         let label: String
-        let slug: String            // directory name under Images/
+        let slug: String
         let imageFileName: String
-        let assetNames: [String]    // file names to download from release
-        let baseURL: URL            // release-assets base URL
+        let assetNames: [String]
+        let baseURL: URL
 
         static let builtIn: [Template] = [
             Template(
@@ -55,9 +59,13 @@ final class ImageManager: ObservableObject {
     @Published var statusMessage: String?
     @Published var errorMessage: String?
 
-    // MARK: - Paths
+    // MARK: - Private
 
     private let fm = FileManager.default
+    private var downloadTask: Task<Void, Never>?
+    private var activeURLTask: URLSessionDownloadTask?
+    private var downloadSession: URLSession?
+    private var downloadCancelled = false
 
     private var documentsDirectory: URL {
         fm.urls(for: .documentDirectory, in: .userDomainMask).first!
@@ -87,8 +95,11 @@ final class ImageManager: ObservableObject {
             images = saved
         }
 
-        // Drop entries whose files disappeared (e.g. user cleared Documents).
+        scanForUncatalogued()
         images.removeAll { !$0.exists }
+        for i in images.indices {
+            images[i].refreshSize()
+        }
         save()
     }
 
@@ -101,12 +112,60 @@ final class ImageManager: ObservableObject {
         }
     }
 
-    // MARK: - Download
+    /// Scan Images/ for subdirectories not yet in the catalog. Picks
+    /// up images dropped in by hand or restored from a backup.
+    private func scanForUncatalogued() {
+        let root = St80Image.imagesRoot.path
+        guard let dp = opendir(root) else { return }
+        defer { closedir(dp) }
 
-    /// Download every asset of the given template to
-    /// `Documents/Images/<slug>/`, then register the image in the
-    /// catalog and select it. Safe to call concurrently — the second
-    /// call is dropped while the first is in progress.
+        while let entry = readdir(dp) {
+            let dirName = withUnsafePointer(to: entry.pointee.d_name) { ptr in
+                String(cString: UnsafeRawPointer(ptr)
+                    .assumingMemoryBound(to: CChar.self))
+            }
+            guard !dirName.hasPrefix(".") else { continue }
+            guard entry.pointee.d_type == DT_DIR else { continue }
+            if images.contains(where: { $0.directoryName == dirName }) { continue }
+
+            let subDir = St80Image.imagesRoot.appendingPathComponent(dirName)
+            if let imageFile = Self.findFirstImageFile(in: subDir) {
+                var img = St80Image.create(
+                    name: dirName, directoryName: dirName,
+                    imageFileName: imageFile, imageLabel: nil)
+                img.refreshSize()
+                images.append(img)
+            }
+        }
+    }
+
+    /// Find a likely Smalltalk-80 image file in a directory. Looks for
+    /// VirtualImage / VirtualImageLSB / Smalltalk.image / *.image.
+    private static func findFirstImageFile(in dir: URL) -> String? {
+        let known = ["VirtualImage", "VirtualImageLSB",
+                     "Smalltalk.image", "smalltalk.image"]
+        for name in known {
+            if FileManager.default
+                .fileExists(atPath: dir.appendingPathComponent(name).path) {
+                return name
+            }
+        }
+        guard let dp = opendir(dir.path) else { return nil }
+        defer { closedir(dp) }
+        while let entry = readdir(dp) {
+            let name = withUnsafePointer(to: entry.pointee.d_name) { ptr in
+                String(cString: UnsafeRawPointer(ptr)
+                    .assumingMemoryBound(to: CChar.self))
+            }
+            if name.hasSuffix(".image") && !name.hasPrefix(".") {
+                return name
+            }
+        }
+        return nil
+    }
+
+    // MARK: - Download (built-in template, multi-asset)
+
     func downloadTemplate(_ template: Template) {
         guard !isDownloading else { return }
 
@@ -114,15 +173,17 @@ final class ImageManager: ObservableObject {
         downloadProgress = 0
         errorMessage = nil
         statusMessage = "Preparing download…"
+        downloadCancelled = false
 
         let destDir = St80Image.imagesRoot
             .appendingPathComponent(template.slug, isDirectory: true)
         try? fm.createDirectory(at: destDir, withIntermediateDirectories: true)
 
-        Task { [fm] in
+        downloadTask = Task { [fm] in
             do {
                 let total = template.assetNames.count
                 for (i, name) in template.assetNames.enumerated() {
+                    if Task.isCancelled || self.downloadCancelled { break }
                     await MainActor.run {
                         self.statusMessage =
                             "Downloading \(name) (\(i + 1) of \(total))…"
@@ -137,44 +198,152 @@ final class ImageManager: ObservableObject {
                     }
                 }
 
+                if Task.isCancelled || self.downloadCancelled {
+                    await MainActor.run {
+                        self.statusMessage = "Download cancelled"
+                        self.isDownloading = false
+                        self.downloadTask = nil
+                    }
+                    return
+                }
+
                 await MainActor.run {
-                    let entry = St80Image(
-                        id: UUID(),
+                    var entry = St80Image.create(
                         name: template.label,
                         directoryName: template.slug,
                         imageFileName: template.imageFileName,
-                        addedAt: Date())
-                    // Replace any older copy with the same slug.
+                        imageLabel: template.label)
+                    entry.refreshSize()
                     self.images.removeAll { $0.directoryName == template.slug }
                     self.images.append(entry)
                     self.selectedImageID = entry.id
                     self.save()
                     self.statusMessage = nil
                     self.isDownloading = false
+                    self.downloadTask = nil
                 }
             } catch {
                 await MainActor.run {
-                    self.errorMessage = "Download failed: \(error.localizedDescription)"
+                    self.errorMessage =
+                        "Download failed: \(error.localizedDescription)"
                     self.statusMessage = nil
                     self.isDownloading = false
+                    self.downloadTask = nil
                 }
             }
         }
     }
 
+    // MARK: - Download (custom URL, single file)
+
+    func downloadCustomURL(_ url: URL, label: String? = nil) {
+        guard !isDownloading else { return }
+
+        isDownloading = true
+        downloadProgress = 0
+        errorMessage = nil
+        downloadCancelled = false
+        let displayName = label ?? url.lastPathComponent
+        statusMessage = "Downloading \(displayName)…"
+
+        let session = URLSession(configuration: .default)
+        downloadSession = session
+        let task = session.downloadTask(with: url) { [weak self] tmp, _, err in
+            Task { @MainActor in
+                self?.handleCustomDownload(tmp: tmp, error: err,
+                                           sourceURL: url, label: displayName)
+            }
+        }
+        // Observe progress on the task.
+        let obs = task.progress.observe(\.fractionCompleted) { [weak self] p, _ in
+            Task { @MainActor in
+                self?.downloadProgress = p.fractionCompleted
+            }
+        }
+        // Hold onto the observation until the task completes.
+        objc_setAssociatedObject(task, &Self.progressKey, obs,
+                                 .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+        activeURLTask = task
+        task.resume()
+    }
+
+    private static var progressKey: UInt8 = 0
+
+    private func handleCustomDownload(tmp: URL?, error: Error?,
+                                      sourceURL: URL, label: String) {
+        defer {
+            isDownloading = false
+            activeURLTask = nil
+            downloadSession?.finishTasksAndInvalidate()
+            downloadSession = nil
+        }
+
+        if let error = error {
+            if (error as NSError).code == NSURLErrorCancelled {
+                statusMessage = "Download cancelled"
+            } else {
+                errorMessage = "Download failed: \(error.localizedDescription)"
+                statusMessage = nil
+            }
+            return
+        }
+        guard let tmp = tmp else {
+            errorMessage = "Download produced no file"
+            statusMessage = nil
+            return
+        }
+
+        let fileName = sourceURL.lastPathComponent.isEmpty
+            ? "VirtualImage" : sourceURL.lastPathComponent
+        let baseName = (fileName as NSString).deletingPathExtension
+        let slug = Self.makeSlug(from: baseName)
+            + "-" + UUID().uuidString.prefix(4).lowercased()
+        let destDir = St80Image.imagesRoot
+            .appendingPathComponent(slug, isDirectory: true)
+
+        do {
+            try fm.createDirectory(at: destDir,
+                                   withIntermediateDirectories: true)
+            let dst = destDir.appendingPathComponent(fileName)
+            try fm.moveItem(at: tmp, to: dst)
+
+            var entry = St80Image.create(
+                name: label, directoryName: slug,
+                imageFileName: fileName, imageLabel: nil)
+            entry.refreshSize()
+            images.append(entry)
+            selectedImageID = entry.id
+            save()
+            statusMessage = nil
+        } catch {
+            errorMessage = "Saving download failed: \(error.localizedDescription)"
+            statusMessage = nil
+        }
+    }
+
+    func cancelDownload() {
+        downloadCancelled = true
+        downloadTask?.cancel()
+        downloadTask = nil
+        activeURLTask?.cancel()
+        activeURLTask = nil
+        downloadSession?.invalidateAndCancel()
+        downloadSession = nil
+        if isDownloading {
+            isDownloading = false
+            statusMessage = "Download cancelled"
+        }
+    }
+
     // MARK: - Import
 
-    /// Copy a user-picked image file (plus any `.sources` / `.changes`
-    /// companions sitting next to it) into the sandboxed Images dir
-    /// and register it. `url` is typically a security-scoped URL from
-    /// UIDocumentPicker or SwiftUI `.fileImporter`.
     func importImage(from url: URL) {
         let scoped = url.startAccessingSecurityScopedResource()
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
 
         let imageFile = url.lastPathComponent
         let base = (imageFile as NSString).deletingPathExtension
-        let slug = Self.makeSlug(from: base)
+        let slug = Self.makeSlug(from: base.isEmpty ? imageFile : base)
             + "-" + UUID().uuidString.prefix(4).lowercased()
         let destDir = St80Image.imagesRoot
             .appendingPathComponent(slug, isDirectory: true)
@@ -185,25 +354,22 @@ final class ImageManager: ObservableObject {
             try fm.copyItem(at: url,
                             to: destDir.appendingPathComponent(imageFile))
 
-            // Copy companion files from the source directory if they
-            // exist: classic Smalltalk-80 ships `<name>.sources` and
-            // `<name>.changes` next to the image.
             let srcDir = url.deletingLastPathComponent()
             for companion in ["Smalltalk-80.sources", "Smalltalk-80.changes",
                               "\(base).sources", "\(base).changes"] {
                 let src = srcDir.appendingPathComponent(companion)
                 if fm.fileExists(atPath: src.path) {
                     try? fm.copyItem(at: src,
-                                     to: destDir.appendingPathComponent(companion))
+                        to: destDir.appendingPathComponent(companion))
                 }
             }
 
-            let entry = St80Image(
-                id: UUID(),
+            var entry = St80Image.create(
                 name: base.isEmpty ? "Imported image" : base,
                 directoryName: slug,
                 imageFileName: imageFile,
-                addedAt: Date())
+                imageLabel: nil)
+            entry.refreshSize()
             images.append(entry)
             selectedImageID = entry.id
             save()
@@ -223,14 +389,69 @@ final class ImageManager: ObservableObject {
         return out.isEmpty ? "image" : String(out.prefix(40))
     }
 
-    // MARK: - Delete
+    // MARK: - Delete / rename / duplicate / launch tracking
 
     func deleteImage(_ image: St80Image) {
         try? fm.removeItem(at: image.directoryURL)
+        if UserDefaults.standard.string(forKey: "st80.autoLaunchImageID")
+            == image.id.uuidString {
+            UserDefaults.standard.removeObject(forKey: "st80.autoLaunchImageID")
+        }
         images.removeAll { $0.id == image.id }
         if selectedImageID == image.id {
             selectedImageID = images.first?.id
         }
+        save()
+    }
+
+    func renameImage(_ image: St80Image, to newName: String) {
+        guard let idx = images.firstIndex(where: { $0.id == image.id }) else { return }
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        images[idx].name = trimmed
+        save()
+    }
+
+    func duplicateImage(_ image: St80Image) {
+        let baseSlug = Self.makeSlug(from: image.name + "-copy")
+        let slug = baseSlug + "-" + UUID().uuidString.prefix(4).lowercased()
+        let destDir = St80Image.imagesRoot
+            .appendingPathComponent(slug, isDirectory: true)
+
+        do {
+            try fm.copyItem(at: image.directoryURL, to: destDir)
+            var entry = St80Image.create(
+                name: "\(image.name) (copy)",
+                directoryName: slug,
+                imageFileName: image.imageFileName,
+                imageLabel: image.imageLabel)
+            entry.refreshSize()
+            images.append(entry)
+            selectedImageID = entry.id
+            save()
+        } catch {
+            errorMessage = "Duplicate failed: \(error.localizedDescription)"
+        }
+    }
+
+    func totalSizeForImage(_ image: St80Image) -> Int64? {
+        guard let contents = try? fm.contentsOfDirectory(
+            at: image.directoryURL,
+            includingPropertiesForKeys: [.fileSizeKey]) else { return nil }
+        var total: Int64 = 0
+        for url in contents {
+            if let size = try? url.resourceValues(forKeys: [.fileSizeKey])
+                .fileSize {
+                total += Int64(size)
+            }
+        }
+        return total > 0 ? total : nil
+    }
+
+    func markLaunched(_ image: St80Image) {
+        guard let idx = images.firstIndex(where: { $0.id == image.id }) else { return }
+        images[idx].lastLaunchedAt = Date()
+        selectedImageID = image.id
         save()
     }
 }
