@@ -1,13 +1,16 @@
-// st80-2026 — Json.hpp (Windows)
+// st80-2026 — Json.hpp
 // Copyright (c) 2026 Aaron Wohl. MIT License.
 //
 // Minimal, allocator-y JSON reader/writer. Scoped down to the
-// shapes the launcher needs: objects, arrays, strings, numbers,
+// shapes the launchers need: objects, arrays, strings, numbers,
 // booleans, null. No streaming, no schema, no exceptions — errors
 // surface as `JsonValue::isNull()` on the returned root.
 //
 // We roll our own rather than pull a third-party header-only lib
-// so the pure-Win32 app stays source-only with no extras.
+// so the launchers stay source-only with no extras. Portable
+// C++17, no platform headers — used by both the Win32 launcher
+// (app/windows/Launcher.cpp) and the GTK4 launcher
+// (app/linux/Launcher.cpp).
 
 #pragma once
 

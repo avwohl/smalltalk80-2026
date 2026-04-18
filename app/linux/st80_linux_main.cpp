@@ -25,6 +25,10 @@
 
 #include "Bridge.h"
 
+#if ST80_LINUX_HAS_LAUNCHER
+#include "Launcher.hpp"
+#endif
+
 #include <SDL.h>
 
 #include <cstdint>
@@ -38,12 +42,19 @@ namespace {
 struct Args {
     std::string imagePath;
     int cyclesPerFrame = 4000;
-    bool noWindow = false;
+    bool noWindow      = false;
+    bool forceLauncher = false;   // --launcher
 };
 
 void usage(const char *argv0) {
     std::fprintf(stderr,
-        "usage: %s [--cycles-per-frame N] [--no-window] <path-to-image>\n",
+        "usage: %s [--cycles-per-frame N] [--no-window]"
+        " [--launcher] [<path-to-image>]\n"
+        "\n"
+        "With no image path, st80-linux opens the GTK4 launcher to"
+        " pick or download an image (when built with the launcher"
+        " enabled). --launcher forces the launcher even when an"
+        " auto-launch image is starred.\n",
         argv0);
 }
 
@@ -58,6 +69,9 @@ int parseArgs(int argc, char **argv, Args &out) {
         } else if (std::strcmp(a, "--no-window") == 0) {
             out.noWindow = true;
             ++i;
+        } else if (std::strcmp(a, "--launcher") == 0) {
+            out.forceLauncher = true;
+            ++i;
         } else if (a[0] == '-' && a[1] != '\0') {
             usage(argv[0]);
             return 64;
@@ -69,10 +83,6 @@ int parseArgs(int argc, char **argv, Args &out) {
             out.imagePath = a;
             ++i;
         }
-    }
-    if (out.imagePath.empty()) {
-        usage(argv[0]);
-        return 64;
     }
     return 0;
 }
@@ -299,6 +309,39 @@ int runWindowed(const Args &args) {
 int main(int argc, char **argv) {
     Args args;
     if (int rc = parseArgs(argc, argv, args); rc != 0) return rc;
-    if (args.noWindow) return runHeadless(args);
-    return runWindowed(args);
+
+    // If no image path was given, route through the launcher
+    // (auto-launch splash → picker → launch). Mirrors the same path
+    // on Catalyst (ContentView.swift) and Windows (st80_windows_main.cpp).
+    if (args.imagePath.empty()) {
+#if ST80_LINUX_HAS_LAUNCHER
+        if (!args.forceLauncher) {
+            std::string displayName;
+            std::string remembered = st80::LoadAutoLaunchInfo(displayName);
+            if (!remembered.empty()) {
+                if (st80::ShowAutoLaunchSplash(argc, argv, remembered,
+                                               displayName)) {
+                    args.imagePath = remembered;
+                }
+            }
+        }
+        if (args.imagePath.empty()) {
+            std::string picked;
+            if (!st80::ShowLauncher(argc, argv, picked)) {
+                return 0;  // user closed launcher
+            }
+            args.imagePath = picked;
+        }
+#else
+        usage(argv[0]);
+        return 64;
+#endif
+    }
+
+    int rc = args.noWindow ? runHeadless(args) : runWindowed(args);
+
+#if ST80_LINUX_HAS_LAUNCHER
+    if (rc == 0) st80::RememberLastImage(args.imagePath);
+#endif
+    return rc;
 }

@@ -1,4 +1,4 @@
-// st80-2026 — Json.cpp (Windows)
+// st80-2026 — Json.cpp
 // Copyright (c) 2026 Aaron Wohl. MIT License.
 //
 // Recursive-descent parser + naive serializer. Tolerant of the

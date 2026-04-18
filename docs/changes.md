@@ -4,6 +4,44 @@ User-visible changes. Most-recent build on top.
 
 ## build 31 — 2026-04-18
 
+**Linux launcher (GTK4).** `st80-linux` no longer requires an image
+path — when invoked with no positional argument it now opens a
+GTK4 image picker that mirrors the Catalyst and Win32 launchers.
+Built only when `libgtk-4-dev` and `libcurl-dev` are present at
+configure time (the .deb keeps building either way; without them
+the binary still works but only via a CLI image path).
+
+Features (port of the Win32 launcher's behaviour, no Pharo /
+iospharo Export-as-App):
+
+  - Sortable Name / Source / Size / Last Modified columns.
+  - Search box at the top (GtkSearchEntry, with built-in clear-X).
+  - Per-row right-click menu: Launch / Rename / Duplicate /
+    Show in Files / Set/Clear Auto-Launch / Delete.
+  - Detail panel under the list with the action strip.
+  - Header-bar buttons: Download…, Add image from file…, Settings.
+  - Download dialog with built-in templates from the manifest
+    *and* a custom-URL field.
+  - Cancel-during-download (curl progress callback observes a
+    flag set from the UI thread).
+  - SHA256-verified manifest downloads, with on-disk fallback
+    cache and a built-in Xerox-v2 fallback if the manifest host
+    is unreachable.
+  - Auto-launch star: `--launcher` overrides; otherwise a starred
+    image triggers a 3-second countdown splash with a "Show
+    Library" escape hatch.
+  - GtkAboutDialog as the Settings sheet (version, project link,
+    license, credits including dbanay, Wolczko, iriyak, Blue Book).
+  - Library state lives at `$XDG_DATA_HOME/st80-2026/library.json`
+    (default `~/.local/share/st80-2026/library.json`); image
+    directories under `Images/<slug>/`. Same JSON schema as the
+    Win32 / Catalyst catalogs, so syncing across platforms is
+    "scp the directory."
+
+Code reuse: `tools/Json.{cpp,hpp}` (relocated from
+`app/windows/`) and `tools/Sha256.{cpp,hpp}` are now shared by
+both the Win32 launcher and the GTK4 launcher.
+
 **Windows launcher catches up to Catalyst / iospharo parity.**
 
   - **Custom URL download** — new "From URL…" button between

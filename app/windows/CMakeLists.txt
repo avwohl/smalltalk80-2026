@@ -14,7 +14,7 @@ add_executable(st80-win WIN32
     st80_windows_main.cpp
     Launcher.cpp
     AboutDialog.cpp
-    Json.cpp
+    ${CMAKE_SOURCE_DIR}/tools/Json.cpp
     ${CMAKE_SOURCE_DIR}/tools/Sha256.cpp
     st80-win.rc
 )
