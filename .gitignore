@@ -15,6 +15,7 @@ build-maccatalyst/
 build-catalyst/
 build-catalyst
 build-linux/
+build-linux-debug/
 build-xcframework/
 build-xcodeproj/
 cmake-build-*/
