@@ -2,6 +2,15 @@
 
 User-visible changes. Most-recent build on top.
 
+## build 32 — 2026-04-20
+
+**GitHub Actions release workflow (Linux).** New
+`.github/workflows/release-linux.yml` builds `.deb` and `.rpm`
+packages for x86_64 and aarch64 on every `v*` tag push and attaches
+the four artifacts to the matching GitHub release. Uses GitHub's
+native ARM runners (`ubuntu-24.04-arm`) — no QEMU. Also runnable
+via `workflow_dispatch` for build-only smoke tests.
+
 ## build 31 — 2026-04-18
 
 **Linux launcher (GTK4).** `st80-linux` no longer requires an image
