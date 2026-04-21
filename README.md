@@ -200,6 +200,14 @@ see `/usr/share/doc/st80/README.md` for the fetcher command.
 See [`THIRD_PARTY_LICENSES`](THIRD_PARTY_LICENSES) for the full
 attribution notices.
 
+## Related
+
+Other repos in this collection:
+
+- **[iospharo](https://github.com/avwohl/iospharo)** — Pharo Smalltalk VM for iOS and Mac Catalyst (interpreter-only, low-bit oop encoding for ASLR compatibility).
+- **[validate_smalltalk_image](https://github.com/avwohl/validate_smalltalk_image)** — Standalone validator and export tool for Spur-format Smalltalk image files (heap integrity, SHA-256 manifests, reference graphs).
+- **[soogle](https://github.com/avwohl/soogle)** — Smalltalk code search engine that indexes packages across Pharo, Squeak, GemStone and more.
+
 ## License
 
 MIT. See [`LICENSE`](LICENSE).
