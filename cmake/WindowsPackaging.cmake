@@ -37,7 +37,13 @@ set(CPACK_PACKAGE_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
 set(CPACK_PACKAGE_VERSION_MINOR ${PROJECT_VERSION_MINOR})
 set(CPACK_PACKAGE_VERSION_PATCH ${PROJECT_VERSION_PATCH})
 set(CPACK_PACKAGE_INSTALL_DIRECTORY "Smalltalk-80")
-set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_SOURCE_DIR}/LICENSE")
+# CPack's WIX generator (v4+) refuses a license file with no
+# extension and only auto-converts .txt → .rtf. The repo's LICENSE
+# file is extensionless, so stage a .txt copy in the build dir and
+# point CPack at that. NSIS happily takes the same file.
+configure_file("${CMAKE_SOURCE_DIR}/LICENSE"
+               "${CMAKE_BINARY_DIR}/LICENSE.txt" COPYONLY)
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_BINARY_DIR}/LICENSE.txt")
 set(CPACK_RESOURCE_FILE_README  "${CMAKE_SOURCE_DIR}/README.md")
 
 # -------------------------------------------------------------------
@@ -79,11 +85,24 @@ endif()
 # -------------------------------------------------------------------
 # WIX — MSI installer (widely used for admin deployment + MDM)
 # -------------------------------------------------------------------
+# Target WiX v4/v5 (the `wix.exe` unified toolchain), not legacy v3's
+# candle/light pair. WiX 7 requires the Open Source Maintenance Fee
+# EULA; WiX 5 is the latest free (MS-RL) line and is what the build
+# expects on PATH. Install via:
+#
+#     dotnet tool install --global wix --version 5.0.2
+#     wix extension add --global WixToolset.UI.wixext/5.0.2
+#
+# CPack emits WiX v4-schema .wxs files in this mode.
+set(CPACK_WIX_VERSION             4)
 # Upgrade GUID: stable across versions so the MSI upgrades cleanly
 # instead of installing side-by-side. Generated once and committed.
 set(CPACK_WIX_UPGRADE_GUID        "3DFB3F1E-5D1C-4E6F-8A2B-9B9A7A5C5C11")
 set(CPACK_WIX_PRODUCT_GUID        "*")   # new GUID per build
-set(CPACK_WIX_LICENSE_RTF         "")    # falls back to plaintext LICENSE
+# NOTE: do not set CPACK_WIX_LICENSE_RTF. When it is unset CPack auto-
+# generates an RTF from CPACK_RESOURCE_FILE_LICENSE (our plaintext
+# LICENSE). Setting it to an empty string makes WiX v4 look for a
+# file named "" and fail with WIX0103.
 if(EXISTS "${CMAKE_SOURCE_DIR}/resources/windows/st80.ico")
     set(CPACK_WIX_PRODUCT_ICON    "${CMAKE_SOURCE_DIR}/resources/windows/st80.ico")
 endif()

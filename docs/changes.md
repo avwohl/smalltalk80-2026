@@ -2,6 +2,28 @@
 
 User-visible changes. Most-recent build on top.
 
+## build 33 — 2026-04-21
+
+**Windows .msi installer.** `cpack -G WIX` in `build-<arch>/` now
+produces `st80-<ver>-Windows-AMD64.msi` (or `-ARM64`) for sideloading
+to testers while the `.msix` goes through Microsoft Store review.
+Required config fixes:
+
+  - Target WiX v4/v5 (`CPACK_WIX_VERSION=4`). Legacy v3
+    (candle/light) was discontinued; v7 requires the OSMF EULA.
+  - Stage a `.txt` copy of the extensionless `LICENSE` for CPack
+    — WiX rejects license files without a recognised extension.
+  - Drop the empty `CPACK_WIX_LICENSE_RTF` override; the default
+    auto-converts the plaintext license to RTF.
+
+Unsigned `.msi` launches via UAC with an "Unknown publisher"
+warning — clickable through, unlike `.msix` which is a hard stop
+without a trusted signature.
+
+Tooling: `dotnet tool install --global wix --version 5.0.2` +
+`wix extension add --global WixToolset.UI.wixext/5.0.2`. No admin
+required.
+
 ## build 32 — 2026-04-20
 
 **GitHub Actions release workflow (Linux).** New
