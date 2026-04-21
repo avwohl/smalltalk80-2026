@@ -6,14 +6,19 @@ the repo layout is the source of truth and this file narrates it.
 ## Layering — 30-second tour
 
     +---------------------------------------------------+
-    |  app/apple        Swift + Metal frontend          |
-    |  app/win32        (future)                        |
-    |  app/linux        (future)                        |
-    +----------------- C boundary ---------------------+
-    |  src/include/Bridge.h   pure-C API               |
+    |  app/apple            SwiftUI + Metal (AppKit)    |
+    |  app/apple-catalyst   SwiftUI + Metal (UIKit)     |
+    |  app/linux            SDL2 + GTK4 launcher        |
+    |  app/windows          pure Win32 + GDI            |
+    +----------------- C boundary ----------------------+
+    |  src/include/Bridge.h   pure-C API                |
     +---------------------------------------------------+
     |  src/platform/apple/    AppleHal, AppleBridge     |
-    |  src/platform/posix/    PosixFileSystem           |
+    |  src/platform/linux/    LinuxHal, LinuxBridge     |
+    |  src/platform/windows/  WindowsHal, WindowsBridge |
+    |  src/platform/posix/    PosixFileSystem (mac/lx)  |
+    |  src/platform/win/      Win32FileSystem           |
+    |  src/platform/common/   EventQueue                |
     |  src/platform/headless/ HeadlessHal (tests)       |
     +----------------- IHal / IFileSystem --------------+
     |  src/core/              Interpreter, ObjectMemory,|
@@ -123,14 +128,27 @@ Display expansion (1-bit → RGBA8) is in `AppleBridge.cpp`'s
 the HAL owns the output buffer but doesn't know how to read the VM's
 display bitmap.
 
-`apple/EventQueue.hpp` — header-only mutex-guarded deque of
+`common/EventQueue.hpp` — header-only mutex-guarded deque of
 `uint16_t`. Push from UI thread, pop from VM (same thread under the
 Phase-2a contract, but the lock keeps the future multi-threaded
-refactor honest).
+refactor honest). Shared by every host HAL.
+
+`linux/LinuxHal.{hpp,cpp}` + `linux/LinuxBridge.cpp` — SDL2-backed
+`IHal` and `Bridge.h` implementation. Same per-word semaphore
+discipline as the Apple bridge; display expansion lives in the
+bridge.
+
+`windows/WindowsHal.{hpp,cpp}` + `windows/WindowsBridge.cpp` —
+Win32 / GDI `IHal` and `Bridge.h` implementation. Message pump
+lives in `app/windows/`; the HAL just owns the RGBA8 staging buffer
+and the event queue.
 
 `posix/PosixFileSystem.hpp` — header-only POSIX implementation of
-`IFileSystem`. Works on macOS / Catalyst / Linux / BSD. The
-`_WIN32` branches are kept intact against Phase-4 Win32 work.
+`IFileSystem`. Used on macOS / Catalyst / Linux.
+
+`win/Win32FileSystem.hpp` — Win32 equivalent for the Windows
+frontend. Same interface, uses `CreateFileW` / `ReadFile` under the
+hood.
 
 `headless/HeadlessHal.hpp` — a no-op `IHal` used by the CLI tools
 and tests. Any graphics-touching call is a no-op; `error` and
@@ -202,13 +220,24 @@ file (see `docs/trace-verification.md`).
 
 ## Things that intentionally *aren't* here (yet)
 
-  * Mac Catalyst target. Needs an .xcodeproj and UIKit rewrites of
-    the frontend (NSView → UIView, NSCursor → UIPointerInteraction,
-    NSEvent → UIEvent). Planned.
   * iOS target. Phase 3. Touch → 3-button mapping; soft keyboard.
-  * Win32 frontend. Phase 4.
-  * Linux frontend. Phase 4.
+    The Catalyst binary's `TARGETED_DEVICE_FAMILY = "1,2,6"` already
+    covers iPhone/iPad; what's missing is the on-device input
+    mapping.
   * JIT. Phase 6. `docs/jit-plan.md` has the copy-and-patch design.
   * Saved-image endian portability. `saveObjects` currently writes
     host-native; the auto-detect on re-load handles it, but if we
     want canonical BE images, that's a separate change.
+
+## Per-platform build docs
+
+Each frontend has a self-contained build guide (prerequisites from
+a clean OS install through to a running image):
+
+  * [`app/apple/README.md`](../app/apple/README.md) — macOS (AppKit).
+  * [`app/apple-catalyst/README.md`](../app/apple-catalyst/README.md)
+    — Mac Catalyst + iOS + App Store Xcode project.
+  * [`app/linux/README.md`](../app/linux/README.md) — Linux SDL2
+    frontend + `.deb` / `.rpm` packaging.
+  * [`app/windows/README.md`](../app/windows/README.md) — Windows
+    pure-Win32 + GDI frontend + NSIS / WiX / MSIX packaging.

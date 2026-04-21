@@ -5,156 +5,53 @@ image for modern systems. Target order: macOS / Mac Catalyst, iOS,
 Windows, Linux. Interpreter first, JIT afterwards on every target
 except iOS.
 
-**Status**: **Phase 4 (Linux)** and **Phase 2 (Apple)** — running
-on native macOS, Mac Catalyst, and x86_64 Linux (SDL2 desktop).
-The Xerox v2 image boots to its desktop on all three; clicks open
-context menus, cursors render, keyboard events deliver. `.deb`
-and `.rpm` packages build on Linux via CPack. Phase 1 gate
-(Xerox `trace2` byte-for-byte) stays green everywhere.
+**Status**: **Phase 4** complete — running natively on macOS, Mac
+Catalyst, x86_64 Linux, and Windows (x64). The Xerox v2 image boots
+to its desktop on all four; clicks open context menus, cursors
+render, keyboard events deliver. Linux `.deb` / `.rpm` and Windows
+NSIS / WiX / MSIX packages build via CPack. Phase 1 gate (Xerox
+`trace2` byte-for-byte) stays green everywhere.
 
-See [`docs/plan.md`](docs/plan.md) for the roadmap,
-[`docs/architecture.md`](docs/architecture.md) for how the code is
-laid out, and [`docs/changes.md`](docs/changes.md) for the build-
-by-build log.
+## Documentation
 
-## Quickstart (macOS)
+  * Roadmap: [`docs/plan.md`](docs/plan.md)
+  * Architecture: [`docs/architecture.md`](docs/architecture.md)
+  * Build-by-build log: [`docs/changes.md`](docs/changes.md)
 
-Prerequisites:
+## Build and run
 
-  * Xcode.app installed (the Metal shader compiler and matched
-    SwiftUI SDK live inside it; the Command Line Tools alone aren't
-    enough)
-  * `cmake` ≥ 3.20 — `brew install cmake`
-  * `gh` CLI for the one-time GitHub clone — `brew install gh`
+Per-platform build and usage docs live next to each frontend. Pick
+yours:
 
-Clone and build the core libraries and CLI tools:
+  * macOS (SwiftUI + Metal, AppKit)
+    → [`app/apple/README.md`](app/apple/README.md)
 
-    git clone git@github.com:avwohl/st80-2026.git
-    cd st80-2026
-    cmake -S . -B build
-    cmake --build build
+  * Mac Catalyst + Xcode project for App Store submission
+    → [`app/apple-catalyst/README.md`](app/apple-catalyst/README.md)
 
-Fetch the Xerox virtual image (released by Xerox 1983; hosted by
-Mario Wolczko):
+  * Linux (SDL2 + `.deb` / `.rpm`)
+    → [`app/linux/README.md`](app/linux/README.md)
 
-    mkdir -p reference/xerox-image
-    curl -sSLo reference/xerox-image/image.tar.gz \
-         http://www.wolczko.com/st80/image.tar.gz
-    (cd reference/xerox-image && tar xzf image.tar.gz)
+  * Windows (pure Win32 + GDI, NSIS / WiX / MSIX)
+    → [`app/windows/README.md`](app/windows/README.md)
 
-Run the CTest suite:
+Each file covers prerequisites from a clean OS install, cloning,
+the build command, running the CTest suite, and how to get an
+image loaded.
 
-    (cd build && ctest --output-on-failure)
+## Getting a Smalltalk-80 image
 
-Sanity-check the Phase 1 gate — diffing our bytecode stream against
-Xerox's canonical `trace2`:
+All four frontends will happily load Xerox's original 1983 virtual
+image, released by Xerox and hosted by Mario Wolczko at
+<http://www.wolczko.com/st80/>. A mirror split into individual
+release assets (no tarball extraction) lives at
+<https://github.com/avwohl/st80-images/releases/tag/xerox-v2> —
+this is what the Mac Catalyst, iOS, and Windows launchers download
+when you click "Download Xerox v2".
 
-    awk '/^Bytecode <[0-9]+>/ { match($0, /<[0-9]+>/);
-         print substr($0, RSTART+1, RLENGTH-2) }' \
-         reference/xerox-image/trace2 > /tmp/trace2_bc.txt
-    ./build/tools/st80_run -n 499 \
-         reference/xerox-image/VirtualImage > /tmp/st80_bc.txt 2>/dev/null
-    diff /tmp/st80_bc.txt /tmp/trace2_bc.txt    # empty = green
-
-Build and launch the macOS app (no Xcode project — the script
-drives `swiftc` directly):
-
-    app/apple/build-macos-app.sh
-    open build/St80.app --args "$PWD/reference/xerox-image/VirtualImage"
-
-You should see the 1983 Xerox Smalltalk-80 desktop. Yellow-click
-opens the World Menu; click-and-hold on a text pane opens the
-text-operate menu.
-
-### Mac Catalyst build
-
-A second app target lives in `app/apple-catalyst/`. Same C++ core,
-same Swift patterns, but the frontend uses UIKit (which is what
-iOS will use). It builds alongside the AppKit app:
-
-    app/apple-catalyst/build-catalyst-app.sh
-    open build/St80Catalyst.app --args "$PWD/reference/xerox-image/VirtualImage"
-
-`otool -l` confirms the Catalyst binary carries `platform 6`
-(macCatalyst) while the AppKit binary is `platform 1` (macOS).
-Both render the identical Xerox desktop.
-
-### Xcode project build (for App Store submission)
-
-`st80.xcodeproj` is the proper Xcode project for producing a signed
-archive uploadable to App Store Connect. Build from the command
-line or open the project in Xcode.app:
-
-    # one-time: copy and edit Local.xcconfig with your Apple team ID
-    cp Local.xcconfig.example Local.xcconfig
-    # edit Local.xcconfig → set DEVELOPMENT_TEAM = XXXXXXXXXX
-
-    # build the xcframework, then the app
-    xcodebuild -project st80.xcodeproj -scheme St80 \
-        -configuration Release \
-        -destination 'platform=macOS,variant=Mac Catalyst' \
-        -derivedDataPath build-xcodeproj \
-        build
-
-`st80.xcodeproj` supports `SUPPORTS_MACCATALYST = YES` and
-`TARGETED_DEVICE_FAMILY = "1,2,6"` — same target can build for
-iPhone, iPad, and Mac Catalyst. For App Store submission: open in
-Xcode, `Product → Archive`, then upload via the Organizer.
-
-A `Check XCFramework Freshness` build phase regenerates
-`Frameworks/St80Core.xcframework` (via `scripts/build-xcframework.sh`)
-whenever a VM source file is newer than the xcframework's
-`Info.plist`, so editing C++ core code and hitting build in Xcode
-Just Works.
-
-## Quickstart (Linux, x86_64)
-
-Tested on Ubuntu 25.10. Other Debian / Fedora derivatives should
-work; the `.deb` and `.rpm` packages target them directly.
-
-Prerequisites:
-
-    sudo apt-get install build-essential cmake ninja-build \
-                         pkg-config libsdl2-dev
-
-For packaging, also:
-
-    sudo apt-get install dpkg-dev rpm
-
-Build and smoke-test:
-
-    cmake -S . -B build-linux -G Ninja
-    cmake --build build-linux
-    (cd build-linux && ctest --output-on-failure)
-
-Fetch the Xerox image once (same source as the macOS path):
-
-    mkdir -p reference/xerox-image
-    curl -sSLo reference/xerox-image/VirtualImage \
-        https://github.com/avwohl/st80-images/releases/download/xerox-v2/VirtualImage
-
-Run the desktop:
-
-    ./build-linux/app/linux/st80-linux reference/xerox-image/VirtualImage
-
-Three-button mouse mapping: plain click = red (select); right-click
-or Alt+click = yellow (text menu); middle-click or Ctrl+click =
-blue (window menu). `--no-window` runs a headless smoke pass.
-
-Build installable packages:
-
-    cd build-linux
-    cpack -G DEB    # → st80_0.1.0_amd64.deb
-    cpack -G RPM    # → st80-0.1.0-1.x86_64.rpm
-
-Install:
-
-    sudo dpkg -i build-linux/st80_*.deb       # Debian / Ubuntu
-    sudo rpm -i  build-linux/st80-*.rpm       # Fedora / RHEL / SUSE
-
-The package installs `/usr/bin/st80-linux` and a desktop menu entry.
-It does not bundle the Xerox image — that has its own licence terms;
-see `/usr/share/doc/st80/README.md` for the fetcher command.
+The image loader auto-detects big-endian (raw Xerox `VirtualImage`)
+vs. little-endian (dbanay's pre-swapped `VirtualImageLSB`), so
+either variant works. See [`docs/image-preprocessing.md`](docs/image-preprocessing.md).
 
 ## What's in the box
 
@@ -166,17 +63,21 @@ see `/usr/share/doc/st80/README.md` for the fetcher command.
     src/include/Bridge.h     Pure-C API the frontend consumes.
     src/platform/apple/      AppleHal + Bridge.h implementation.
     src/platform/linux/      LinuxHal + Bridge.h implementation.
+    src/platform/windows/    WindowsHal + Bridge.h implementation.
     src/platform/posix/      POSIX IFileSystem (macOS + Linux).
+    src/platform/win/        Win32 IFileSystem.
     src/platform/common/     Host-neutral EventQueue.
     src/platform/headless/   No-op IHal (tests + tools).
-    app/apple/               SwiftUI + Metal AppKit frontend (macOS).
-    app/apple-catalyst/      SwiftUI + Metal UIKit frontend (Catalyst).
-    app/linux/               SDL2 frontend (Linux).
+    app/apple/               SwiftUI + Metal AppKit frontend.
+    app/apple-catalyst/      SwiftUI + Metal UIKit frontend.
+    app/linux/               SDL2 frontend.
+    app/windows/             Pure Win32 + GDI frontend with launcher.
     cmake/LinuxPackaging.cmake
                              CPack config for .deb and .rpm.
     packaging/linux/         .desktop file.
+    packaging/windows/       NSIS / WiX / MSIX release driver.
     tools/                   st80_probe (loader sanity), st80_run
-                             (trace tool).
+                             (trace tool), st80_validate.
     tests/                   CTest smoke + end-to-end bridge test.
     reference/               gitignored — clone of dbanay/Smalltalk
                              (MIT) and the Xerox image go here.

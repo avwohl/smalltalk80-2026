@@ -4,6 +4,16 @@ Runbook for shipping a distributable `.dmg` of the Mac Catalyst app.
 Requires an Apple Developer Program membership; most of this can't be
 automated without the user's credentials.
 
+Other targets have their own release paths and don't belong here:
+
+  * Windows — NSIS `.exe`, WiX `.msi`, and MSIX for the Microsoft
+    Store. See [`../app/windows/README.md`](../app/windows/README.md)
+    "Release build + installer packaging".
+  * Linux — `.deb` / `.rpm` via CPack, plus a GitHub Actions
+    workflow that attaches x86_64 + aarch64 artifacts to tagged
+    releases. See [`../app/linux/README.md`](../app/linux/README.md)
+    and `.github/workflows/release-linux.yml`.
+
 ## Prerequisites (one-time, per-developer)
 
 - Apple Developer Program membership ($99/yr). Required for the

@@ -2,6 +2,19 @@
 
 User-visible changes. Most-recent build on top.
 
+## build 34 — 2026-04-21
+
+**Docs refresh for all four frontends.** Root `README.md` now lists
+macOS, Mac Catalyst, Linux, and Windows with links to each frontend's
+own build guide. Per-platform READMEs under `app/apple/`,
+`app/apple-catalyst/`, `app/linux/`, and `app/windows/` each cover
+prerequisites from a clean OS install through to a running image.
+`docs/architecture.md` drops the "Win32/Linux future" markers,
+describes `src/platform/{linux,windows,win,common}/`, and points to
+the per-frontend guides. `docs/release.md` now signposts that
+Windows (NSIS / WiX / MSIX) and Linux (CPack + GitHub Actions) have
+their own release paths documented next to each frontend.
+
 ## build 33 — 2026-04-21
 
 **Windows .msi installer.** `cpack -G WIX` in `build-<arch>/` now
