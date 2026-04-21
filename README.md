@@ -206,6 +206,7 @@ Other repos in this collection:
 
 - **[iospharo](https://github.com/avwohl/iospharo)** — Pharo Smalltalk VM for iOS and Mac Catalyst (interpreter-only, low-bit oop encoding for ASLR compatibility).
 - **[validate_smalltalk_image](https://github.com/avwohl/validate_smalltalk_image)** — Standalone validator and export tool for Spur-format Smalltalk image files (heap integrity, SHA-256 manifests, reference graphs).
+- **[pharo-headless-test](https://github.com/avwohl/pharo-headless-test)** — Headless Pharo test runner with a fake GUI; clicks menus, takes screenshots, runs SUnit without a display.
 - **[soogle](https://github.com/avwohl/soogle)** — Smalltalk code search engine that indexes packages across Pharo, Squeak, GemStone and more.
 
 ## License
