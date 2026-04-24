@@ -11,6 +11,9 @@
 //   3. MetalView           — once the user launches an image.
 
 import SwiftUI
+#if !targetEnvironment(macCatalyst)
+import UIKit
+#endif
 
 private enum Screen {
     case splash(St80Image)
@@ -25,6 +28,14 @@ struct ContentView: View {
     @State private var didApplyAutoLaunch = false
     @State private var showingAbout = false
     @State private var showingExport = false
+
+    // iPhone-only: side of the screen the ControlStrip lives on. True
+    // places it against the trailing edge — the side OPPOSITE the camera
+    // notch / Dynamic Island, which sits on the device's top edge.
+    // Landscape-left rotates the device top to the left, so the notch
+    // ends up on the screen's left; strip goes right. Landscape-right
+    // is the mirror. Pattern ported from iospharo ContentView.
+    @State private var stripOnRight: Bool = false
 
     @AppStorage("st80.autoLaunchImageID") private var autoLaunchImageID: String?
 
@@ -53,10 +64,28 @@ struct ContentView: View {
                                      edges: [.leading, .trailing, .bottom])
                 #else
                 HStack(spacing: 0) {
-                    ControlStripView()
-                    MetalView(imagePath: path)
+                    if stripOnRight {
+                        MetalView(imagePath: path)
+                        ControlStripView()
+                    } else {
+                        ControlStripView()
+                        MetalView(imagePath: path)
+                    }
                 }
                 .ignoresSafeArea(.container, edges: .bottom)
+                .onAppear {
+                    UIDevice.current.beginGeneratingDeviceOrientationNotifications()
+                    updateStripSide()
+                }
+                .onReceive(NotificationCenter.default.publisher(
+                    for: UIDevice.orientationDidChangeNotification)) { _ in
+                    // Safe-area insets update a beat after the orientation
+                    // notification fires. Wait one tick so the strip's
+                    // per-corner inset math sees the new insets.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        updateStripSide()
+                    }
+                }
                 #endif
             }
         }
@@ -95,4 +124,30 @@ struct ContentView: View {
         manager.markLaunched(image)
         screen = .running(image.imagePath)
     }
+
+    #if !targetEnvironment(macCatalyst)
+    /// Put the ControlStrip on the side opposite the camera notch /
+    /// Dynamic Island. UIDevice orientation tells us where the device
+    /// top (camera) points:
+    ///   .landscapeLeft  → top points LEFT  → strip on RIGHT
+    ///   .landscapeRight → top points RIGHT → strip on LEFT
+    /// Portrait / unknown / flat falls back to the interface orientation,
+    /// where the sense is inverted (interface .landscapeRight = camera
+    /// on LEFT). Portrait leaves the strip on the leading edge.
+    private func updateStripSide() {
+        let dev = UIDevice.current.orientation
+        if dev == .landscapeLeft {
+            stripOnRight = true
+            return
+        }
+        if dev == .landscapeRight {
+            stripOnRight = false
+            return
+        }
+        if let scene = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene }).first {
+            stripOnRight = scene.interfaceOrientation == .landscapeRight
+        }
+    }
+    #endif
 }

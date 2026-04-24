@@ -290,3 +290,11 @@ extern "C" void st80_post_key_down(int charCode, uint32_t /*modifiers*/) {
 extern "C" void st80_post_key_up(int /*charCode*/, uint32_t /*modifiers*/) {
     // Decoded keyboard — no separate up event. Symmetry with Apple.
 }
+
+extern "C" const char *st80_clipboard_read(void) {
+    static thread_local std::string buf;
+    buf.clear();
+    if (!g_runtime || !g_runtime->vm) return "";
+    buf = g_runtime->vm->getClipboardText();
+    return buf.c_str();
+}

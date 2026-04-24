@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5fa7de"/>
+      <stop offset="1" stop-color="#cde5f7"/>
+    </linearGradient>
+    <!-- Balloon dome as a squashed ellipse: looking down from ~60° above
+         horizontal, the balloon's profile foreshortens vertically. Width
+         (horizontal) stays, height compresses → wider-than-tall oval. -->
+    <ellipse id="dome" cx="512" cy="470" rx="400" ry="360"/>
+    <clipPath id="domeClip"><use href="#dome"/></clipPath>
+    <radialGradient id="shadeDome" cx="0.35" cy="0.28" r="0.75">
+      <stop offset="0"    stop-color="white" stop-opacity="0.4"/>
+      <stop offset="0.5"  stop-color="white" stop-opacity="0.0"/>
+      <stop offset="1"    stop-color="#001233" stop-opacity="0.22"/>
+    </radialGradient>
+    <filter id="drop" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="18"/>
+      <feOffset dx="0" dy="30" result="o"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.35"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="1024" height="1024" fill="url(#sky)"/>
+
+  <!-- 8 gore "pie wedges" radiating from dome center, projected onto
+       the foreshortened ellipse via the clip-path. Each wedge is drawn
+       as an oversized triangle from center to a point well outside the
+       ellipse so the clip trims it to a crisp gore. -->
+  <g clip-path="url(#domeClip)" filter="url(#drop)">
+    <g transform="translate(512 470)">
+      <!-- wedge endpoints at r=600, 8 directions (45° apart), starting
+           at straight up (-90°), rotating clockwise. -->
+      <path d="M 0 0 L 0 -600 L 424.3 -424.3 Z" fill="#e04052"/>
+      <path d="M 0 0 L 424.3 -424.3 L 600 0 Z"  fill="#f39a33"/>
+      <path d="M 0 0 L 600 0 L 424.3 424.3 Z"   fill="#f7d13c"/>
+      <path d="M 0 0 L 424.3 424.3 L 0 600 Z"   fill="#7fc050"/>
+      <path d="M 0 0 L 0 600 L -424.3 424.3 Z"  fill="#4ea8dc"/>
+      <path d="M 0 0 L -424.3 424.3 L -600 0 Z" fill="#3d79c2"/>
+      <path d="M 0 0 L -600 0 L -424.3 -424.3 Z" fill="#8363be"/>
+      <path d="M 0 0 L -424.3 -424.3 L 0 -600 Z" fill="#e05db3"/>
+    </g>
+
+    <!-- Dome shading — highlight upper-left, shade opposite. -->
+    <use href="#dome" fill="url(#shadeDome)"/>
+
+    <!-- Gore seams as lines from center through each wedge boundary. -->
+    <g stroke="rgba(0,0,0,0.22)" stroke-width="3">
+      <line x1="512" y1="110" x2="512" y2="830"/>
+      <line x1="112" y1="470" x2="912" y2="470"/>
+      <line x1="229" y1="216" x2="795" y2="724"/>
+      <line x1="795" y1="216" x2="229" y2="724"/>
+    </g>
+  </g>
+
+  <!-- Outer rim stroke of the dome -->
+  <use href="#dome" fill="none" stroke="#1a1a1a" stroke-width="12"/>
+
+  <!-- Basket peeking out below the dome — a small wicker rectangle
+       directly under the balloon's center, partially hidden by the
+       rim. Ropes run from the dome's bottom edge to the basket. -->
+  <g>
+    <!-- 4 ropes from the lower rim of the dome to basket corners.
+         Endpoints sit ON the ellipse (cx=512, cy=470, rx=400, ry=360):
+         θ=118° → (324,788), θ=100° → (442,825),
+         θ=80°  → (582,825), θ=62°  → (700,788).  -->
+    <g stroke="#222" stroke-width="5" stroke-linecap="round">
+      <line x1="324" y1="788" x2="430" y2="872"/>
+      <line x1="442" y1="825" x2="468" y2="872"/>
+      <line x1="582" y1="825" x2="556" y2="872"/>
+      <line x1="700" y1="788" x2="594" y2="872"/>
+    </g>
+    <!-- basket body -->
+    <rect x="430" y="870" width="164" height="78" rx="6"
+          fill="#a76c3a" stroke="#4a2a10" stroke-width="5"/>
+    <!-- rim highlight -->
+    <rect x="430" y="870" width="164" height="14" rx="6" fill="#c68b54"/>
+    <!-- wicker weave horizontals -->
+    <g stroke="#4a2a10" stroke-width="2" opacity="0.7">
+      <line x1="435" y1="900" x2="589" y2="900"/>
+      <line x1="435" y1="920" x2="589" y2="920"/>
+      <line x1="435" y1="940" x2="589" y2="940"/>
+    </g>
+    <!-- wicker weave verticals (subtle) -->
+    <g stroke="#4a2a10" stroke-width="1.5" opacity="0.5">
+      <line x1="455" y1="884" x2="455" y2="948"/>
+      <line x1="485" y1="884" x2="485" y2="948"/>
+      <line x1="515" y1="884" x2="515" y2="948"/>
+      <line x1="545" y1="884" x2="545" y2="948"/>
+      <line x1="575" y1="884" x2="575" y2="948"/>
+    </g>
+  </g>
+</svg>

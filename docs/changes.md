@@ -2,6 +2,82 @@
 
 User-visible changes. Most-recent build on top.
 
+## build 35 — 2026-04-24
+
+**Apple-side input, clipboard, and icon fixes.** A batch of
+bug-fixes and small features across Mac Catalyst and iOS.
+
+Keyboard (Mac Catalyst / iPad hardware keyboard):
+
+  - Shift-key mapping. `pressesBegan` now prefers `key.characters`
+    (fully resolved with Shift / Ctrl already applied) over
+    `charactersIgnoringModifiers`, which stripped Shift. Symptom:
+    typing `2 + 2` produced `2 = 2`, `"` became `'`, `(` became
+    `9`, etc. Fix also lets hardware Ctrl+letter arrive at the
+    image as the matching 0x01..0x1F control byte — so the Blue
+    Book editor's Ctrl+D / Ctrl+P / Ctrl+S bindings now work from
+    the physical keyboard.
+
+Clipboard (Mac + iOS, both directions):
+
+  - New `st80_clipboard_read()` HAL entry point. Walks the
+    SystemDictionary (oop 25286) to find the `ParagraphEditor`
+    class, reads `classPool[#CurrentSelection]`, unwraps the
+    resulting `Text` to its backing `String`, and returns UTF-8
+    bytes. Defensive against image-layout variants (falls back
+    to scanning the class's pointer slots for any Dictionary that
+    contains `#CurrentSelection` if the canonical index-7 slot
+    doesn't match).
+  - Cmd+C / Cmd+X post Ctrl+C / Ctrl+X to the VM, then 150ms
+    later mirror `CurrentSelection` to `UIPasteboard.general`.
+    150ms is a best-effort delay since the interpreter runs on
+    its own worker thread and the input queue has no synchronous
+    barrier — in practice a hammered Cmd+C gets one stale read on
+    the first press and catches up on the next.
+  - Cmd+V streams the iOS / Mac pasteboard into the VM as a key
+    event stream (the existing path — now available from soft-key
+    input on iOS too, not just macCatalyst).
+  - Strip Cut / Copy / Paste buttons wired to the same
+    system-clipboard paths.
+
+iPhone on-screen strip:
+
+  - Action buttons ported from iospharo: Do it, Print it,
+    Inspect, Accept, Cancel, Cut, Copy, Paste, Backspace. Each
+    emits the matching ASCII control byte (Ctrl+D = 0x04, …)
+    directly, since the Xerox image's decoded keyboard has no
+    modifier side-channel.
+  - Strip now flips to the side opposite the camera notch /
+    Dynamic Island on each orientation change (`UIDevice.current
+    .orientation` drives a `stripOnRight` flag in ContentView,
+    with `interfaceOrientation` as fallback for unknown / flat).
+  - `delaysTouchesBegan = true` on the yellow-menu long-press
+    gesture. Fixes "do it on selection" — previously the
+    spurious RED click that fired before long-press recognized
+    was clearing the current text selection.
+  - `touchesBegan` reclaims first responder when `keyboardVisible`
+    is set. SwiftUI strip button taps were silently stealing
+    first responder; symptom was "typing stopped going anywhere"
+    after tapping any strip button.
+  - Action stack wrapped in `ScrollView` so every button stays
+    reachable on DI iPhones in landscape, where the bottom zone
+    is narrow.
+
+Icon:
+
+  - New top-down app icon: 8-gore colored balloon dome viewed
+    from above, wicker basket peeking out below with suspension
+    ropes visibly attached to the rim. SVG source committed
+    alongside the 1024×1024 PNG so future edits are text-only.
+    Previous icon had the ropes floating detached from the
+    balloon and an `St` text-tag in the stripe.
+
+Build:
+
+  - Apple `CFBundleVersion` bumped 1 → 35 (both plists) so the
+    marketing version chip in the Image Library header shows the
+    new build number.
+
 ## build 34 — 2026-04-21
 
 **Docs refresh for all four frontends.** Root `README.md` now lists

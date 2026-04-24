@@ -189,10 +189,8 @@ struct ImageLibraryView: View {
             Link("GitHub", destination: URL(string:
                 "https://github.com/avwohl/smalltalk80-2026")!)
             Text("·").foregroundColor(.secondary)
-            Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"]
-                    as? String ?? "?") "
-                + "(\(Bundle.main.infoDictionary?["CFBundleVersion"]
-                    as? String ?? "?"))")
+            Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?") "
+                + "(\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"))")
                 .foregroundColor(.secondary)
             Link("Changes", destination: URL(string:
                 "https://github.com/avwohl/smalltalk80-2026/blob/main/docs/changes.md")!)

@@ -1,15 +1,18 @@
 // st80-2026 — ControlStripView.swift (Catalyst / iOS)
 // Copyright (c) 2026 Aaron Wohl. MIT License.
 //
-// Vertical control strip pinned to the leading edge of the VM view
-// on iOS. The iPad soft keyboard has no Ctrl or Cmd — both are
-// central in Smalltalk (Ctrl for editor commands, Cmd for system
-// actions) — so we provide virtual toggles here, plus Esc / Tab /
-// Backspace and a show/hide toggle for the keyboard itself.
-//
-// StripButton + layout pattern ported from iospharo's ContentView
-// (MIT, same author — see THIRD_PARTY_LICENSES). Trimmed for Blue
-// Book (no DoIt/PrintIt/InspectIt/Debug buttons).
+// Vertical control strip pinned to the trailing-or-leading edge of
+// the VM view on iOS (see `stripOnRight` in ContentView — the strip
+// moves opposite the camera notch / Dynamic Island on each orientation
+// change). The iPad soft keyboard has no Ctrl — central in Smalltalk
+// for editor commands — so we provide a virtual Ctrl toggle plus a
+// show/hide keyboard toggle, raw-key buttons (Esc / Tab / Backspace)
+// and one-tap shortcuts for the Blue Book text editor (Do it, Print
+// it, Inspect, Accept, Cancel, Cut, Copy, Paste). Pattern ported
+// from iospharo's ContentView (MIT, same author — see
+// THIRD_PARTY_LICENSES). The action buttons emit ASCII control
+// codes directly since the Xerox image's decoded keyboard has no
+// modifier side-channel — see St80InputController.sendCtrlLetter.
 //
 // Geometry: iPad has a tiny R=18 squircle corner (< 2pt intrusion
 // at x=4) so a static top inset works. iPhone in landscape needs
@@ -30,7 +33,9 @@ struct ControlStripView: View {
     @ObservedObject private var controller = St80InputController.shared
 
     fileprivate static let buttonSize: CGFloat = 40
+    fileprivate static let actionSize: CGFloat = 26
     fileprivate static let buttonSpacing: CGFloat = 6
+    fileprivate static let actionSpacing: CGFloat = 3
     fileprivate static let stripWidth: CGFloat = 48
 
     private var layout: StripLayout { StripLayout.current() }
@@ -44,11 +49,18 @@ struct ControlStripView: View {
             if layout.splitZones {
                 Spacer()
                     .frame(minHeight: layout.zoneGap)
-                bottomGroup
+                // Action/raw-key stack is taller than the post-DI zone on
+                // most DI iPhones in landscape. Let it scroll so every
+                // button stays reachable even when the strip would
+                // otherwise clip.
+                ScrollView(.vertical, showsIndicators: false) {
+                    bottomGroup
+                }
             } else {
                 separator
-                bottomGroup
-                Spacer()
+                ScrollView(.vertical, showsIndicators: false) {
+                    bottomGroup
+                }
             }
         }
         .padding(.bottom, layout.bottomInset)
@@ -83,17 +95,51 @@ struct ControlStripView: View {
     }
 
     private var bottomGroup: some View {
-        VStack(spacing: Self.buttonSpacing) {
-            StripButton(label: "Esc", size: Self.buttonSize, tooltip: "Escape") {
-                controller.sendRaw(27)
-            }
-            StripButton(label: "Tab", size: Self.buttonSize, tooltip: "Tab") {
-                controller.sendRaw(9)
-            }
+        VStack(spacing: Self.actionSpacing) {
             StripButton(icon: "delete.left",
-                        size: Self.buttonSize,
+                        size: Self.actionSize,
                         tooltip: "Backspace") {
                 controller.sendRaw(8)
+            }
+            StripButton(icon: "play.fill",
+                        size: Self.actionSize,
+                        tooltip: "Do it (Ctrl-D)") {
+                controller.sendCtrlLetter("d")
+            }
+            StripButton(icon: "text.append",
+                        size: Self.actionSize,
+                        tooltip: "Print it (Ctrl-P)") {
+                controller.sendCtrlLetter("p")
+            }
+            StripButton(icon: "eyeglasses",
+                        size: Self.actionSize,
+                        tooltip: "Inspect (Ctrl-Q)") {
+                controller.sendCtrlLetter("q")
+            }
+            StripButton(icon: "checkmark.circle",
+                        size: Self.actionSize,
+                        tooltip: "Accept (Ctrl-S)") {
+                controller.sendCtrlLetter("s")
+            }
+            StripButton(icon: "xmark.circle",
+                        size: Self.actionSize,
+                        tooltip: "Cancel (Ctrl-L)") {
+                controller.sendCtrlLetter("l")
+            }
+            StripButton(icon: "scissors",
+                        size: Self.actionSize,
+                        tooltip: "Cut to clipboard") {
+                controller.copySelectionToSystemClipboard(cut: true)
+            }
+            StripButton(icon: "doc.on.doc",
+                        size: Self.actionSize,
+                        tooltip: "Copy to clipboard") {
+                controller.copySelectionToSystemClipboard(cut: false)
+            }
+            StripButton(icon: "doc.on.clipboard",
+                        size: Self.actionSize,
+                        tooltip: "Paste from clipboard") {
+                controller.pasteFromSystemClipboard()
             }
         }
     }

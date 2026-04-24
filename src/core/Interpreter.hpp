@@ -1437,6 +1437,23 @@ private:
     std::string stringFromObject(int strOop);
     int stringObjectFor(const char *s);
 
+public:
+    // Read the VM's most-recently-copied text from
+    // `ParagraphEditor class>>CurrentSelection`, the Blue Book image's
+    // global text clipboard. Walks the Smalltalk SystemDictionary,
+    // finds the ParagraphEditor class, looks up #CurrentSelection in
+    // its classPool, and unwraps the resulting Text to its backing
+    // String. Returns empty on any lookup miss or layout surprise —
+    // defensive against image variants.
+    //
+    // THREAD-SAFETY: reads live object memory. Call from the same
+    // thread that drives `st80_run`, or while the interpreter is
+    // known to be idle (waiting for input). The HAL frontends enqueue
+    // a Ctrl+C/X keystroke and call this on the next run tick.
+    std::string getClipboardText();
+
+private:
+
 #ifdef DEBUGGING_SUPPORT
     std::string selectorName(int selector);
     std::string classNameOfObject(int objectPointer);

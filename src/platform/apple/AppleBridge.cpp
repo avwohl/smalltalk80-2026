@@ -321,3 +321,17 @@ extern "C" void st80_post_key_up(int /*charCode*/, uint32_t /*modifiers*/) {
     // emitted by post_key_down. This hook exists for future undecoded
     // / meta-key handling (shift, ctrl, alpha-lock — BB codes 136-139).
 }
+
+extern "C" const char *st80_clipboard_read(void) {
+    // Backing buffer is thread-local so concurrent callers from the
+    // display thread (Metal draw loop) and an NSPasteboard callback
+    // don't scribble on each other. Reading the VM's object memory is
+    // still a potential race with the interpreter worker; callers
+    // schedule the read after a short delay so Ctrl+C/X has likely
+    // been processed and CurrentSelection is stable. Best-effort.
+    static thread_local std::string buf;
+    buf.clear();
+    if (!g_runtime || !g_runtime->vm) return "";
+    buf = g_runtime->vm->getClipboardText();
+    return buf.c_str();
+}

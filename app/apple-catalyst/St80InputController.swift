@@ -45,7 +45,40 @@ final class St80InputController: ObservableObject {
         if shift       { mods |= ST80_MOD_SHIFT }
         if ctrlActive  { mods |= ST80_MOD_CTRL;    ctrlActive = false }
         if cmdActive   { mods |= ST80_MOD_COMMAND; cmdActive = false }
-        st80_post_key_down(code, mods)
+        // C bridge ignores modifier flags; fold Ctrl into the byte below.
+        _ = mods
+        st80_post_key_down(code, 0)
+    }
+
+    /// Send a Smalltalk-80 editor shortcut: `Ctrl+<letter>` delivered as
+    /// the matching ASCII control code (D→4, P→16, S→19, …). The decoded
+    /// keyboard has no modifier side-channel, so action buttons in the
+    /// on-screen strip must emit the control byte directly. Letter may
+    /// be given in either case; only 'A'..'Z' / 'a'..'z' are accepted.
+    func sendCtrlLetter(_ letter: Character) {
+        guard let scalar = letter.unicodeScalars.first else { return }
+        let v = scalar.value
+        let base: UInt32
+        if v >= 0x41 && v <= 0x5A      { base = v }          // 'A'..'Z'
+        else if v >= 0x61 && v <= 0x7A { base = v - 0x20 }   // 'a'..'z'
+        else { return }
+        st80_post_key_down(Int32(base & 0x1F), 0)
+    }
+
+    /// Paste the iOS pasteboard's text contents into the VM as a stream
+    /// of key events. Thin wrapper so SwiftUI strip views can trigger
+    /// system-clipboard paste without reaching into the MTKView. The
+    /// actual keystroke pump lives on St80MTKView.pasteFromSystemClipboard.
+    func pasteFromSystemClipboard() {
+        (mtkView as? St80MTKView)?.pasteFromSystemClipboard()
+    }
+
+    /// Trigger a full VM→system-clipboard copy (or cut when `cut` is true):
+    /// the MTKView sends Ctrl+C / Ctrl+X to the VM and, once the VM has
+    /// had time to update `ParagraphEditor>>CurrentSelection`, mirrors
+    /// that text to `UIPasteboard.general`.
+    func copySelectionToSystemClipboard(cut: Bool) {
+        (mtkView as? St80MTKView)?.copyVMSelectionToSystemClipboard(cut: cut)
     }
 
     /// Called by St80MTKView.insertText / pressesBegan to add any

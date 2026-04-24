@@ -124,6 +124,23 @@ void st80_post_mouse_up(int x, int y, St80MouseButton button);
 void st80_post_key_down(int charCode, uint32_t modifiers);
 void st80_post_key_up(int charCode, uint32_t modifiers);
 
+/* =========================================================================
+ * Clipboard (copy-out direction)
+ *
+ * Reads the Blue Book image's global text clipboard —
+ * `ParagraphEditor class>>CurrentSelection` — as a 7-bit-ASCII byte
+ * stream. Returns a pointer to a caller-owned, NUL-terminated buffer
+ * managed by the core; the buffer is valid until the next call or
+ * `st80_shutdown`. Empty string means no selection, or the image
+ * hasn't populated CurrentSelection yet. The frontend is expected to
+ * call this after it has posted a Ctrl+C / Ctrl+X keystroke and the
+ * interpreter has had a chance to process it.
+ *
+ * Paste direction is handled by streaming keystrokes through
+ * `st80_post_key_down` — no separate entry point needed.
+ * ========================================================================= */
+const char *st80_clipboard_read(void);
+
 #ifdef __cplusplus
 }  /* extern "C" */
 #endif

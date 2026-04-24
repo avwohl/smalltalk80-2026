@@ -4124,7 +4124,7 @@ int Interpreter::stringObjectFor(const char *s)
 {
     if (!s)
         return NilPointer;
-    
+
     const char *p = s;
     while (*p)
         p++;
@@ -4136,6 +4136,113 @@ int Interpreter::stringObjectFor(const char *s)
         memory.storeByte_ofObject_withValue(i, objectPointer, *p++);
     }
     return objectPointer;
+}
+
+// Walk a HashedCollection (Dictionary / SystemDictionary / classPool)
+// looking for an Association whose key (#key at index 0) is a Symbol
+// whose bytes equal `name`. Returns the Association oop, or NilPointer.
+//
+// Layout: HashedCollection has one named inst var `tally` at index 0,
+// then variable-pointer slots 1..n holding Associations or nil. We
+// skip SmallIntegers (tally) and any non-pointer object that can't
+// plausibly be an Association. An Association is 2 named-vars wide
+// (key, value) — anything shorter gets skipped.
+static int findAssociationInDict(st80::ObjectMemory &memory,
+                                 int dict,
+                                 const char *name,
+                                 std::string (*readSymbol)(int, st80::ObjectMemory &))
+{
+    using namespace st80;
+    if (dict == NilPointer) return NilPointer;
+    if (memory.isIntegerObject(dict)) return NilPointer;
+    int length = memory.fetchWordLengthOf(dict);
+    for (int i = 0; i < length; i++) {
+        int slot = memory.fetchPointer_ofObject(i, dict);
+        if (slot == NilPointer || memory.isIntegerObject(slot)) continue;
+        if (memory.fetchWordLengthOf(slot) < 2) continue;
+        int key = memory.fetchPointer_ofObject(0, slot);
+        if (key == NilPointer || memory.isIntegerObject(key)) continue;
+        if (memory.fetchClassOf(key) != ClassSymbolPointer) continue;
+        std::string keyStr = readSymbol(key, memory);
+        if (keyStr == name) return slot;
+    }
+    return NilPointer;
+}
+
+// Helper to bridge the free function above back into a member that
+// can call `stringFromObject`. Kept out of the class so the walker
+// doesn't need to know about `this`.
+static std::string readSymbolBytes(int symOop, st80::ObjectMemory &memory)
+{
+    int len = memory.fetchByteLengthOf(symOop);
+    std::string s;
+    s.reserve(len);
+    for (int i = 0; i < len; i++)
+        s.append(1, (char)memory.fetchByte_ofObject(i, symOop));
+    return s;
+}
+
+std::string Interpreter::getClipboardText()
+{
+    // Smalltalk at: #ParagraphEditor  — walk the SystemDictionary.
+    int peAssoc = findAssociationInDict(memory, SmalltalkPointer,
+                                        "ParagraphEditor",
+                                        readSymbolBytes);
+    if (peAssoc == NilPointer) return "";
+    int peClass = memory.fetchPointer_ofObject(1, peAssoc);
+    if (peClass == NilPointer || memory.isIntegerObject(peClass)) return "";
+
+    // ParagraphEditor's classPool is at inst-var index 7 per the
+    // Blue Book Class layout (Behavior[0..3] + ClassDescription[4..5]
+    // + Class[6:name, 7:classPool, 8:sharedPools]). If the image
+    // uses a different layout, fall back to scanning every pointer
+    // slot of the class for a Dictionary that contains #CurrentSelection.
+    int classPool = NilPointer;
+    if (memory.fetchWordLengthOf(peClass) > 7) {
+        int candidate = memory.fetchPointer_ofObject(7, peClass);
+        if (candidate != NilPointer && !memory.isIntegerObject(candidate) &&
+            memory.fetchWordLengthOf(candidate) >= 1) {
+            int assoc = findAssociationInDict(memory, candidate,
+                                              "CurrentSelection",
+                                              readSymbolBytes);
+            if (assoc != NilPointer) classPool = candidate;
+        }
+    }
+    if (classPool == NilPointer) {
+        int length = memory.fetchWordLengthOf(peClass);
+        for (int i = 0; i < length; i++) {
+            int slot = memory.fetchPointer_ofObject(i, peClass);
+            if (slot == NilPointer || memory.isIntegerObject(slot)) continue;
+            if (memory.fetchWordLengthOf(slot) < 1) continue;
+            int assoc = findAssociationInDict(memory, slot,
+                                              "CurrentSelection",
+                                              readSymbolBytes);
+            if (assoc != NilPointer) { classPool = slot; break; }
+        }
+        if (classPool == NilPointer) return "";
+    }
+
+    // classPool at: #CurrentSelection
+    int csAssoc = findAssociationInDict(memory, classPool,
+                                        "CurrentSelection",
+                                        readSymbolBytes);
+    if (csAssoc == NilPointer) return "";
+    int text = memory.fetchPointer_ofObject(1, csAssoc);
+    if (text == NilPointer || memory.isIntegerObject(text)) return "";
+
+    // CurrentSelection is typically a Text with `string runs` — pull
+    // the String out of slot 0. If the image stored a plain String or
+    // Symbol directly, use it as-is.
+    int textClass = memory.fetchClassOf(text);
+    int strOop = text;
+    if (textClass != ClassStringPointer && textClass != ClassSymbolPointer) {
+        if (memory.fetchWordLengthOf(text) < 1) return "";
+        strOop = memory.fetchPointer_ofObject(0, text);
+        if (strOop == NilPointer || memory.isIntegerObject(strOop)) return "";
+        int sc = memory.fetchClassOf(strOop);
+        if (sc != ClassStringPointer && sc != ClassSymbolPointer) return "";
+    }
+    return stringFromObject(strOop);
 }
 
 

@@ -296,6 +296,11 @@ final class St80MTKView: MTKView {
         yellow.minimumPressDuration = 0.4
         yellow.allowableMovement = .greatestFiniteMagnitude
         yellow.cancelsTouchesInView = true
+        // Without this, touchesBegan posts a RED down before the long-press
+        // recognizes — a spurious click that clears any text selection, so
+        // "do it" opens on an empty selection. Delaying defers touchesBegan
+        // until the gesture decides it will NOT recognize.
+        yellow.delaysTouchesBegan = true
         addGestureRecognizer(yellow)
 
         let blue = UITapGestureRecognizer(
@@ -396,6 +401,15 @@ final class St80MTKView: MTKView {
         let pt = t.location(in: self)
         guard let (x, y) = vmCoords(pt) else { return }
 
+#if !targetEnvironment(macCatalyst)
+        // Keep soft-keyboard text input alive: SwiftUI Button taps on the
+        // ControlStrip steal first responder. Without this, typing "stops
+        // going anywhere" after the user interacts with any strip button.
+        if St80InputController.shared.keyboardVisible && !isFirstResponder {
+            _ = becomeFirstResponder()
+        }
+#endif
+
 #if targetEnvironment(macCatalyst)
         lastHoverLocation = pt
         moveCursorOverlay(to: pt)
@@ -457,23 +471,37 @@ final class St80MTKView: MTKView {
         for press in presses {
             guard let key = press.key else { continue }
 
-#if targetEnvironment(macCatalyst)
-            // ⌘-V pastes the system clipboard into the VM as a stream
-            // of key events. The image's own cut/copy/paste remains
-            // unchanged; this is a one-way bridge from the Mac
-            // clipboard into whatever text editor has the Smalltalk
-            // caret. Copy-out would need a HAL primitive + image
-            // modification and is not implemented.
-            if key.modifierFlags.contains(.command),
-               (key.charactersIgnoringModifiers == "v"
-                || key.charactersIgnoringModifiers == "V") {
-                pasteFromSystemClipboard()
-                continue
+            // ⌘-V / ⌘-C / ⌘-X bridge the VM and host clipboards:
+            //   ⌘-V streams the host clipboard into the VM as key events
+            //        (keeps the image's own Ctrl+V binding working too —
+            //         the image's CurrentSelection is left untouched).
+            //   ⌘-C / ⌘-X forward to the VM as Ctrl+C / Ctrl+X, then
+            //        after a short delay the VM's updated
+            //        ParagraphEditor>>CurrentSelection is mirrored to
+            //        UIPasteboard. See `copyVMSelectionToSystemClipboard`.
+            let ignoringMods = key.charactersIgnoringModifiers
+            if key.modifierFlags.contains(.command) {
+                if ignoringMods == "v" || ignoringMods == "V" {
+                    pasteFromSystemClipboard()
+                    continue
+                }
+                if ignoringMods == "c" || ignoringMods == "C" {
+                    copyVMSelectionToSystemClipboard(cut: false)
+                    continue
+                }
+                if ignoringMods == "x" || ignoringMods == "X" {
+                    copyVMSelectionToSystemClipboard(cut: true)
+                    continue
+                }
             }
-#endif
 
-            guard let chars = key.charactersIgnoringModifiers.unicodeScalars.first
-                      ?? key.characters.unicodeScalars.first
+            // Prefer `key.characters` (fully resolved: shift and ctrl already
+            // applied) over `charactersIgnoringModifiers`. UIKit delivers
+            // Shift+'=' as characters="+" but charactersIgnoringModifiers="=" —
+            // reading the unshifted form first sent '=' when the user typed
+            // '+'. Also makes Ctrl+D arrive as 0x04 (decoded keyboard's do-it).
+            guard let chars = key.characters.unicodeScalars.first
+                      ?? key.charactersIgnoringModifiers.unicodeScalars.first
             else { continue }
             var code = Int32(chars.value)
             if code < 0 || code > 0x7F {
@@ -483,6 +511,17 @@ final class St80MTKView: MTKView {
             case 0x7F: code = 8  // Delete → BS
             case 0x0A: code = 13 // LF → CR
             default: break
+            }
+            // Cmd+letter: Cocoa doesn't fold Cmd into the resolved char
+            // (unlike Ctrl, which `key.characters` already collapses to
+            // 0x01..0x1F). Fold it here so Cmd+C/X/D/P/S/L/Q etc. reach
+            // the Blue Book image as the matching ASCII control code.
+            // Cmd+V was handled above; Cmd+Shift combos (uppercase
+            // letter) fold the same way since `code & 0x1F` is
+            // case-insensitive for 0x40..0x7E.
+            if key.modifierFlags.contains(.command),
+               code >= 0x40, code <= 0x7E {
+                code &= 0x1F
             }
             var mods: UInt32 = 0
             let flags = key.modifierFlags
@@ -494,8 +533,7 @@ final class St80MTKView: MTKView {
         }
     }
 
-#if targetEnvironment(macCatalyst)
-    private func pasteFromSystemClipboard() {
+    func pasteFromSystemClipboard() {
         guard let text = UIPasteboard.general.string, !text.isEmpty else { return }
         for scalar in text.unicodeScalars {
             var code = Int32(scalar.value)
@@ -510,7 +548,26 @@ final class St80MTKView: MTKView {
             st80_post_key_down(code, 0)
         }
     }
-#endif
+
+    /// Send a VM-internal cut or copy (Ctrl+X / Ctrl+C) and mirror the
+    /// resulting selection to `UIPasteboard.general` once the VM has
+    /// had a chance to update `ParagraphEditor class>>CurrentSelection`.
+    ///
+    /// The 150ms delay is a best-effort: the interpreter runs on its own
+    /// worker and input events are queued, so there's no synchronous
+    /// barrier we can wait on. In practice a few tens of ms is plenty;
+    /// if the user hammers Cmd+C faster than that, one stale read is
+    /// the worst case (the previous selection ends up on the clipboard).
+    func copyVMSelectionToSystemClipboard(cut: Bool) {
+        let controlByte: Int32 = cut ? 0x18 : 0x03  // Ctrl+X / Ctrl+C
+        st80_post_key_down(controlByte, 0)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            guard let cstr = st80_clipboard_read() else { return }
+            let text = String(cString: cstr)
+            guard !text.isEmpty else { return }
+            UIPasteboard.general.string = text
+        }
+    }
 
     override func pressesEnded(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
         // Decoded keyboard — down/up pair emitted inside st80_post_key_down.
@@ -531,6 +588,29 @@ extension St80MTKView: UIKeyInput {
     var hasText: Bool { true }
 
     func insertText(_ text: String) {
+        let ctrl = St80InputController.shared.ctrlActive
+        let cmd  = St80InputController.shared.cmdActive
+
+        // ⌘-V / ⌘-C / ⌘-X — mirror the Mac hardware-keyboard path above.
+        // Paste: streams iOS pasteboard into the VM. Copy/Cut: sends the
+        // matching control byte to the VM and then pushes
+        // CurrentSelection up to UIPasteboard after a short delay.
+        if cmd && (text == "v" || text == "V") {
+            pasteFromSystemClipboard()
+            St80InputController.shared.cmdActive = false
+            return
+        }
+        if cmd && (text == "c" || text == "C") {
+            copyVMSelectionToSystemClipboard(cut: false)
+            St80InputController.shared.cmdActive = false
+            return
+        }
+        if cmd && (text == "x" || text == "X") {
+            copyVMSelectionToSystemClipboard(cut: true)
+            St80InputController.shared.cmdActive = false
+            return
+        }
+
         for scalar in text.unicodeScalars {
             var code = Int32(scalar.value)
             switch scalar.value {
@@ -539,8 +619,16 @@ extension St80MTKView: UIKeyInput {
             default:
                 if code < 0x20 || code > 0x7E { continue }
             }
-            let mods = St80InputController.shared.consumeActiveModifiers(0)
-            st80_post_key_down(code, mods)
+            // If the virtual Ctrl *or* Cmd toggle is armed and we're sending a
+            // printable character 0x40–0x7E, fold it to the matching
+            // ASCII control code (A→1, D→4, V→22, …). The Blue Book
+            // decoded keyboard has no modifier side-channel, so Cmd+C
+            // must arrive as the control byte, not as 'c' + a flag.
+            if (ctrl || cmd), code >= 0x40, code <= 0x7E {
+                code &= 0x1F
+            }
+            _ = St80InputController.shared.consumeActiveModifiers(0)
+            st80_post_key_down(code, 0)
         }
     }
 
