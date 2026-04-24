@@ -76,6 +76,21 @@ if(WIN32)
     add_subdirectory(app/windows)
 endif()
 
+# MS-DOS / DPMI: DJGPP cross-compiled slice. Activates only when
+# configured with -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-djgpp.cmake
+# (which sets CMAKE_SYSTEM_NAME=MSDOS; CMake maps that to DJGPP=1).
+# Primary runtime is `dosiz` (https://github.com/avwohl/dosiz) — an
+# in-process dosbox-staging host with a full ring-3 DPMI implementation
+# that serves INT 21h directly against the host filesystem. Secondary
+# runtime is real DOS / FreeDOS with CWSDPMI or HDPMI32.
+# See docs/dos-plan.md.
+if(DJGPP)
+    add_subdirectory(src/platform/dos)
+    # app/dos/ lands in Phase D2 with the VBE frontend. Until then,
+    # st80_dos alone compiles and is enough to link st80_run against
+    # for the headless trace2 gate (Phase D1).
+endif()
+
 # --- packaging ------------------------------------------------------
 # Linux: CPack → DEB + RPM.
 # Windows: CPack → NSIS (self-extracting installer) + WIX (.msi),
