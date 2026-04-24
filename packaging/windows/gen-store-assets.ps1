@@ -78,6 +78,12 @@ try {
     Save-Scaled 310 310 (Join-Path $OutDir 'Square310x310Logo.png') $false
     Save-Scaled 310 150 (Join-Path $OutDir 'Wide310x150Logo.png')   $true
     Save-Scaled 620 300 (Join-Path $OutDir 'SplashScreen.png')      $true
+
+    # Store listing artwork (not bundled in the MSIX). These go on the
+    # Partner Center listing page as "Store logos" — Box art must be
+    # square 1:1, Poster art is 2:3 portrait.
+    Save-Scaled 1080 1080 (Join-Path $OutDir 'BoxArt-1080x1080.png')  $false
+    Save-Scaled  720 1080 (Join-Path $OutDir 'PosterArt-720x1080.png') $true
 } finally {
     $src.Dispose()
 }

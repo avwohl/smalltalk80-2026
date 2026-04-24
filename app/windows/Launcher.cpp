@@ -984,19 +984,16 @@ LRESULT CALLBACK inputDialogProc(HWND hwnd, UINT msg,
                 st->result = buf;
                 st->ok     = true;
                 st->done   = true;
-                PostQuitMessage(0);
                 return 0;
             }
             if (LOWORD(wp) == IDCANCEL) {
                 st->ok   = false;
                 st->done = true;
-                PostQuitMessage(0);
                 return 0;
             }
             break;
         case WM_CLOSE:
             if (st) { st->ok = false; st->done = true; }
-            PostQuitMessage(0);
             return 0;
     }
     return DefWindowProcW(hwnd, msg, wp, lp);
@@ -1133,19 +1130,16 @@ LRESULT CALLBACK downloadPickerProc(HWND hwnd, UINT msg,
                                                         LB_GETCURSEL, 0, 0));
                 st->picked = (sel == LB_ERR) ? -1 : sel;
                 st->done   = true;
-                PostQuitMessage(0);
                 return 0;
             }
             if (LOWORD(wp) == IDCANCEL) {
                 st->picked = -1;
                 st->done   = true;
-                PostQuitMessage(0);
                 return 0;
             }
             break;
         case WM_CLOSE:
             if (st) { st->picked = -1; st->done = true; }
-            PostQuitMessage(0);
             return 0;
     }
     return DefWindowProcW(hwnd, msg, wp, lp);
@@ -1291,7 +1285,6 @@ LRESULT CALLBACK autoLaunchSplashProc(HWND hwnd, UINT msg,
                 } else {
                     st->proceed = true;
                     st->done    = true;
-                    PostQuitMessage(0);
                 }
             }
             return 0;
@@ -1299,13 +1292,11 @@ LRESULT CALLBACK autoLaunchSplashProc(HWND hwnd, UINT msg,
             if (st && LOWORD(wp) == ID_SPLASH_LIB) {
                 st->proceed = false;
                 st->done    = true;
-                PostQuitMessage(0);
                 return 0;
             }
             break;
         case WM_CLOSE:
             if (st) { st->proceed = false; st->done = true; }
-            PostQuitMessage(0);
             return 0;
     }
     return DefWindowProcW(hwnd, msg, wp, lp);

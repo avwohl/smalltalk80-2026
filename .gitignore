@@ -6,19 +6,16 @@ Local.xcconfig
 *.a
 *.dSYM/
 build/
-build-app/
-build-macos/
-build-sim/
-build-cpp/
-build-test/
-build-maccatalyst/
-build-catalyst/
-build-catalyst
-build-linux/
-build-linux-debug/
-build-xcframework/
-build-xcodeproj/
+build-*/
 cmake-build-*/
+
+# Scratch runners/logs at repo root (leading underscore = throwaway)
+/_*.bat
+/_*.ps1
+/_*.log
+
+# Claude Code session state (per-checkout runtime, never shared)
+.claude/scheduled_tasks.lock
 
 # Package outputs
 *.deb
