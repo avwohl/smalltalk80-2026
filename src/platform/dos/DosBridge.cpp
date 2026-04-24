@@ -25,7 +25,7 @@
 #include <string>
 
 #include "DosHal.hpp"
-#include "DosHostFileSystem.hpp"
+#include "HostFileSystem.hpp"
 #include "Interpreter.hpp"
 #include "ObjectMemory.hpp"
 #include "Oops.hpp"

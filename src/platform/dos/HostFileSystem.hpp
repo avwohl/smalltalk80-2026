@@ -1,4 +1,4 @@
-// st80-2026 — DosHostFileSystem.hpp
+// st80-2026 — HostFileSystem.hpp (DOS / DJGPP)
 // Copyright (c) 2026 Aaron Wohl. MIT License.
 //
 // DJGPP provides a POSIX-ish C library on top of INT 21h — <fcntl.h>,
