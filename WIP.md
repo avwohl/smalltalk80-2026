@@ -1,160 +1,145 @@
-# WIP — MS-DOS / DPMI port
+# WIP — MS-DOS / FreeDOS / DPMI port
 
-Work-in-progress snapshot. Session dated 2026-04-24.
-Delete this file once Phase D5 ships.
+Work-in-progress snapshot. Session dated 2026-05-18.
+Delete this file once Phase D5 ships (release published + verified).
 
 ## Where we are
 
-Phase D0 (scaffolding) and Phase D1 (tooling wire-up) landed in two
-commits. Phase D2 (VBE display) has not started. Nothing
-user-visible yet — no changes.md bump.
+D0–D1 landed earlier (scaffolding + headless wiring). This session
+added the actual DOS-runnable frontend: **D2 (VBE display), D3
+(mouse + keyboard), D4 (filesystem, inherited)** are code-complete,
+and **D5** has its packaging target. Nothing binary-verified yet —
+no DJGPP toolchain on this box.
 
 Recent commits on `main`:
 
-    ddf9a1b  dos: wire st80_run for DJGPP, let trace2_check drive via dosiz
-    28ac42d  dos: add DPMI plan doc, DJGPP toolchain file, and platform slice scaffold
+    2623ce0  dos: add app/dos VBE+mouse+keyboard frontend (D2-D4)
+    ddf9a1b  dos: wire st80_run for DJGPP (D1)
+    28ac42d  dos: DPMI plan + DJGPP toolchain + platform slice (D0)
+
+`docs/dos-plan.md` is authoritative; its new "Status (2026-05-18)"
+section has the phase table. This file is the run-it-next handoff.
 
 ## What this port is
 
-A DJGPP-cross-compiled `st80.exe` (go32-v2 stub + COFF payload) that
-boots the Xerox v2 image. Primary runtime is **dosiz**
-(`C:\temp\src\dosiz`) — an in-process dosbox-staging + C++ ring-3
-DPMI host by the same author that serves INT 21h against host files.
-Secondary runtime is real DOS / FreeDOS with CWSDPMI or HDPMI32.
+A DJGPP-cross-compiled `st80.exe` (go32-v2 stub + COFF) that boots
+the Xerox v2 image to a VESA desktop. Primary runtime is **dosiz**
+(`C:\temp\src\dosiz`, same author) — in-process dosbox-staging +
+ring-3 DPMI host. Secondary is real DOS / FreeDOS with a
+user-supplied CWSDPMI / HDPMI32. We bundle the image (DOS TCP is
+too flaky for a startup fetch); we do NOT ship a DPMI host.
 
-We do NOT ship a DPMI host. dosiz provides one for the dev/CI loop;
-real-DOS users supply their own.
+## What landed this session (commit 2623ce0)
 
-We DO ship the image bundled with the .exe on DOS (unlike the other
-four platforms, which use a fetcher). Reason: DOS TCP stacks are
-flaky enough that a startup download is a support hole.
+    app/dos/VbeDisplay.{hpp,cpp}   VBE 2.0+ probe (4F00/4F01),
+                                   best-LFB-mode pick, 4F02h set,
+                                   __dpmi_physical_address_mapping
+                                   LFB, per-scanline blit + XOR-ish
+                                   software cursor composite. Has a
+                                   probe()-only path (no mode set).
+    app/dos/MouseInt33.{hpp,cpp}   INT 33h: reset/detect (AX=0),
+                                   motion mickeys (AX=0Bh) → absolute
+                                   VM cursor, buttons (AX=03h) edges.
+    app/dos/KbdInt16.{hpp,cpp}     polled _bios_keybrd; ASCII pass-
+                                   through + fwd-Delete=127; shift
+                                   status for the blue-button map.
+    app/dos/Launcher.{hpp,cpp}     CP437 text banner / error / probe
+    app/dos/st80_dos_main.cpp      arg parse, prime VM, cooperative
+                                   loop; --probe / --no-display /
+                                   --cycles-per-frame / --scale
+    app/dos/CMakeLists.txt         target `st80` → st80.exe
+    app/dos/README.md              build + run guide (dosiz + real)
+    cmake/DosPackaging.cmake       opt-in `st80_dos_zip` (no DPMI
+                                   host bundled)
+    CMakeLists.txt                 if(DJGPP) now adds app/dos +
+                                   include(DosPackaging) — gated,
+                                   host builds untouched
 
-Full plan is in `docs/dos-plan.md` — keep it authoritative.
+All DPMI/BIOS access uses the dosiz `dj_ems.c` convention: zeroed
+`__dpmi_regs`, ES:DI / DS:DX at `__tb`, `__dpmi_int`, `dosmemget`
+back. Confirmed available under dosiz per its
+`docs/c-toolchain-guide.md`.
 
-## What's committed
+## "Don't break existing ports" — verified
 
-- `cmake/toolchain-djgpp.cmake` — cross-toolchain file. Picks up
-  `i586-pc-msdosdjgpp-{gcc,g++}` off PATH. Sets SYSTEM_NAME=MSDOS
-  which triggers CMake's DJGPP=1.
-- `src/platform/dos/` — HAL slice:
-    DosHal.hpp / DosHal.cpp     IHal impl, mirrors WindowsHal
-    DosBridge.cpp               Bridge.h C API on top of DosHal
-    HostFileSystem.hpp          one-line alias to PosixFileSystem
-    CMakeLists.txt              builds libst80_dos.a
-- `CMakeLists.txt` (root) — new `if(DJGPP)` block alongside
-  WIN32 / APPLE / UNIX. Only activates st80_dos; app/dos/ lands
-  in D2.
-- `tools/CMakeLists.txt` — DJGPP branch added. Selects
-  `src/platform/dos/` for HostFileSystem.hpp and includes
-  `src/platform/posix/` as extra header path so the alias works.
-- `tests/trace2_check.sh` — optional RUNNER env var / 4th arg
-  that prepends a command (eg `dosiz`) to the st80_run invocation.
-  Lets the existing trace2 gate drive a DJGPP binary under dosiz.
-- `docs/dos-plan.md` — full plan, updated for dosiz and for
-  bundling the image.
+Reconfigured the MSVC `build/` (clean; the DJGPP block stays inert)
+and rebuilt `st80core`, `st80_run/probe/validate`, `st80_windows`,
+`st80-win` — all green. `git diff HEAD~1 HEAD` touches zero
+`src/core` / `src/include` / `tests` files.
 
-Memory saved at `~/.claude/projects/.../memory/dosiz_reference.md`.
+Caveat: `ctest` `core_smoke_test` SEGFAULTs (~4.3 s) on this MSVC
+Debug host. **Pre-existing and unrelated** — the core/test compiler
+inputs are byte-identical to the pre-change tree, so this commit
+cannot have caused it. Flagged here so it isn't mistaken for DOS
+fallout; worth a separate look on its own.
 
-## What to run after reboot to verify D1
+## What to run to verify (needs DJGPP + dosiz)
 
-Need DJGPP cross toolchain on PATH (e.g. `andrewwutw/build-djgpp`
-v3.4 — same one dosiz's own test suite uses). Need dosiz built at
-`C:\temp\src\dosiz\build\dosiz.exe`. Need the Xerox v2 image at
-`reference/xerox-image/VirtualImage` with the `trace2` sibling
-(fetch per `docs/trace-verification.md`).
+Prereqs: DJGPP cross toolchain on PATH (`andrewwutw/build-djgpp`
+v3.4 — same one dosiz tests against). `dosiz.exe` already built at
+`C:\temp\src\dosiz\build\dosiz.exe` (confirmed present). Xerox v2
+image at `reference/xerox-image/VirtualImage` (+ `trace2` sibling).
 
-    # On Windows, use MSYS2 MINGW x64 shell since dosiz.exe needs
-    # its MinGW64 DLL dir on PATH. Or copy the DLLs alongside.
     cd /c/temp/src/smalltalk80-2026
-
-    # Cross-configure and build st80_run for DOS
     cmake -S . -B build-dos \
           -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-djgpp.cmake
-    cmake --build build-dos --target st80_run
+    cmake --build build-dos --target st80_run st80
 
-    # Expected: build-dos/tools/st80_run.exe exists (DJGPP COFF)
-    file build-dos/tools/st80_run.exe     # => "MS-DOS executable"
-
-    # Run the trace2 gate under dosiz
+    # D1 gate — byte-for-byte trace under dosiz
     RUNNER="/c/temp/src/dosiz/build/dosiz.exe" \
-        tests/trace2_check.sh \
-        reference/xerox-image/VirtualImage \
-        reference/xerox-image/trace2 \
-        build-dos/tools/st80_run.exe
+      tests/trace2_check.sh \
+      reference/xerox-image/VirtualImage \
+      reference/xerox-image/trace2 \
+      build-dos/tools/st80_run.exe
+    # expect: trace2_check: OK (499 bytecodes byte-for-byte)
 
-Expected output: `trace2_check: OK (499 bytecodes byte-for-byte)`.
+    # D2 Risk-#2 probe (text mode, no graphics) — cheapest signal
+    dosiz build-dos/app/dos/st80.exe --probe \
+          reference/xerox-image/VirtualImage
+    # expect: a chosen VBE mode line + "INT 33h mouse: present"
 
-If that works, D1's exit criterion is met and we can proceed to D2
-with confidence. If it fails, the interesting failure modes are:
+    # D2/D3 — boot to the desktop, screenshot, Read it
+    dosiz --window build-dos/app/dos/st80.exe \
+          reference/xerox-image/VirtualImage
+    # then scrot/screencapture/nircmd; Read the PNG; confirm pixels
 
-  a. DJGPP cross-toolchain not on PATH → "compiler not found"
-     during the first cmake call. Install it.
-  b. libstdc++ build gaps (std::mutex on --disable-threads, etc.)
-     → compile errors in DosHal.cpp or shared headers. If this
-     happens we'll need the EventQueueSingleThreaded.hpp mitigation
-     mentioned in `docs/dos-plan.md` Risk #1.
-  c. dosiz INT 21h gaps on the exact calls DJGPP's newlib makes
-     to open/read/lseek the image. dosiz's `DJ_FILE` fixture
-     exercises this path so it should work — but our image read
-     is ~1 MiB in one AH=3F call, larger than any fixture I've
-     seen in dosiz's suite. See Risk #8.
-  d. Trace diff mismatch → interpreter bug; not specific to DOS.
-     Run the same gate natively first to confirm it passes.
+Likely failure modes, in order of interest:
+  a. DJGPP not on PATH → cmake "compiler not found". Install it.
+  b. libstdc++ `--disable-threads` gaps (std::mutex/atomic) →
+     compile errors in shared headers. Mitigation = dos-plan
+     Risk #1 (EventQueueSingleThreaded.hpp).
+  c. VBE: dosiz returns no LFB mode → VbeDisplay::begin error
+     text. `--probe` isolates this without a mode switch.
+  d. `__dpmi_physical_address_mapping` semantics differ under
+     dosiz — code already falls back to physBase as linear.
+  e. trace mismatch → interpreter bug, not DOS-specific; run the
+     same gate natively first.
 
 ## Next decision point
 
-Three natural next moves, pick one after verifying D1:
+1. Get DJGPP installed, run the verify block above (cheapest:
+   `--probe`, then the trace gate, then `--window` screenshot).
+2. CI workflow `.github/workflows/dos-ci.yml`: build DJGPP +
+   dosiz in a cache layer, run the D1 gate every push.
+3. Wire arrow/function keys only if a real Smalltalk workflow
+   needs them (the other four ports don't map them either).
 
-1. **CI workflow** (`.github/workflows/dos-ci.yml`). Install DJGPP
-   via `andrewwutw/build-djgpp`, clone+build dosiz, fetch Xerox
-   image from Wolczko, run trace2 gate. Medium lift. Makes the D1
-   gate regression-proof on every push.
+Recommendation: #1 — the code makes strong claims about the DJGPP
+DPMI/VBE path that are cheap to falsify with `--probe`.
 
-2. **Phase D2 — VBE display** under `app/dos/`. DPMI INT 10h VBE
-   probe via `__dpmi_int`, mode pick (1024x768x32 LFB preferred),
-   LFB map through INT 31h/0800h, dirty-rect blit. Largest chunk
-   remaining (2-3 days in the plan). No user-facing testing until
-   D3 adds input.
+## Key files next session
 
-3. **Local verify only** — don't advance until D1 is green on
-   this machine.
+- `docs/dos-plan.md` — authoritative, see "Status (2026-05-18)"
+- `app/dos/VbeDisplay.cpp` — the riskiest piece (VBE/DPMI)
+- `app/dos/README.md` — build/run, both runtimes
+- `C:\temp\src\dosiz\docs\c-toolchain-guide.md` — DJGPP setup +
+  libc quirks. Read before debugging a cross-build failure.
+- `C:\temp\src\dosiz\tests\djgpp\dj_ems.c` — the __dpmi_int /
+  __tb / dosmemget pattern our BIOS calls mirror.
 
-Session recommendation was #3 first: D0+D1 make strong claims about
-the DJGPP path that are cheap to validate before sinking time into
-D2.
+## Conventions (CLAUDE.md)
 
-## Key files to open next session
-
-- `docs/dos-plan.md` — authoritative plan, phases D0..D6
-- `src/platform/dos/DosBridge.cpp` — mirrors WindowsBridge.cpp
-- `src/platform/windows/WindowsHal.cpp` — reference pattern for D2
-  when we write the VBE frontend
-- `src/include/Bridge.h` — the C API the DOS frontend will drive
-- `C:\temp\src\dosiz\docs\c-toolchain-guide.md` — DJGPP setup,
-  libc quirks, env vars. Essential reading before debugging.
-- `C:\temp\src\dosiz\tests\djgpp\` — working DJGPP fixtures that
-  model what our st80_run.exe should look like under dosiz.
-
-## Context — dosiz quirks to remember
-
-- `dosiz.exe` on Windows needs MSYS2 MinGW64 DLLs on PATH or
-  next to the .exe. Run from MSYS2 MINGW x64 shell.
-- dosiz's DJGPP CI suite uses `andrewwutw/build-djgpp` v3.4 —
-  use the same toolchain for version alignment.
-- dosiz env vars: `DOSIZ_PATH` extends DOS PATH; `DOSIZ_TRACE`
-  dumps INT 21h/31h per-call. `DOSIZ_EXC_TRACE` for PM fault
-  debugging.
-- dosiz host-side env passes `DJGPP` through to the DOS env
-  block automatically (see dosiz's `build_env_block()`).
-- CWSDPMI is NOT needed under dosiz — dosiz has its own DPMI
-  0.9 ring-3 host. Only matters for the real-DOS secondary path.
-
-## Context — project conventions (CLAUDE.md)
-
-- No markdown tables. Indented plain-text columns.
-- No #ifdef in portable source. Per-platform dirs only.
-- Commit every 15 min silently. Update docs/changes.md before
-  user-visible commits (this port isn't user-visible yet).
-- No workarounds — fix root causes.
-- GUI claims require a screenshot, read with Read tool.
-- GUI tests always under `timeout N`; never `open -W`.
+No markdown tables. No #ifdef in portable source — per-platform
+dirs only. Commit ~15 min. No workarounds — fix root causes (e.g.
+VbeDisplay errors out, never silently drops to CGA). GUI claims
+need a screenshot Read with the Read tool, always under a timeout.

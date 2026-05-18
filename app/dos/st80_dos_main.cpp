@@ -29,6 +29,7 @@
 //                         exit (CI / trace2 parity with --no-window)
 //   --help
 
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>

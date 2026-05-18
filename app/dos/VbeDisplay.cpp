@@ -16,6 +16,7 @@
 #include "VbeDisplay.hpp"
 
 #include <algorithm>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 
@@ -79,6 +80,17 @@ VbeDisplay::~VbeDisplay() { end(); }
 bool VbeDisplay::selectMode(int vmW, int vmH) {
     vmW_ = vmW;
     vmH_ = vmH;
+
+    // The 512-byte VBE info block and 256-byte mode block both go
+    // through the DJGPP DOS transfer buffer; make sure it is big
+    // enough (default is >= 4 KiB, but don't assume).
+    if (_go32_info_block.size_of_transfer_buffer < 512) {
+        std::snprintf(error_, sizeof(error_),
+                      "DJGPP transfer buffer is %lu bytes; need >=512 "
+                      "for the VBE info block.",
+                      _go32_info_block.size_of_transfer_buffer);
+        return false;
+    }
 
     // ---- 4F00h: VBE controller info ------------------------------------
     unsigned char vib[512];
@@ -333,8 +345,9 @@ void VbeDisplay::putFbRow(int fbX, int fbY,
     const unsigned long off =
         static_cast<unsigned long>(fbY) * mode_.bytesPerLine +
         static_cast<unsigned long>(fbX) * bytesPerPx;
+    // DJGPP flat model: a near pointer's value is its DS offset.
     movedata(_my_ds(),
-             reinterpret_cast<unsigned>(bytes),
+             static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(bytes)),
              static_cast<unsigned>(mode_.lfbSelector),
              static_cast<unsigned>(off),
              static_cast<std::size_t>(n) * bytesPerPx);
@@ -356,7 +369,10 @@ void VbeDisplay::blitNoCursor(const std::uint32_t *src, int srcStride,
     if (x1 <= x0 || y1 <= y0) return;
 
     const int span = x1 - x0;
-    static thread_local unsigned char line[2048 * 4];
+    // Single-threaded DOS (DJGPP --disable-threads, no TLS): a plain
+    // function-static scratch line is correct and avoids depending
+    // on thread_local, which the target libc may not support.
+    static unsigned char line[2048 * 4];
     if (span > 2048) return;                       // mode wider than we map
 
     for (int yy = y0; yy < y1; ++yy) {
@@ -384,7 +400,7 @@ void VbeDisplay::drawCursor(const std::uint32_t *src, int srcStride,
     // Composite the new cursor: a set bit is opaque black, a clear
     // bit shows the underlying RGBA pixel (Blue Book §29 hotspot is
     // the form's top-left, which Bridge.h already accounts for).
-    static thread_local unsigned char line[16 * 4];
+    static unsigned char line[16 * 4];
     std::uint32_t row[16];
     for (int yy = 0; yy < 16; ++yy) {
         const int vy = cy + yy;

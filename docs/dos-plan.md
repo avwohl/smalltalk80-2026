@@ -47,6 +47,39 @@ our JIT'd code on iOS, so "JIT-built st80 on iOS via dosiz" is a
 technically valid sidestep of Apple's JIT entitlement. Slow, but
 correct. Noted and set aside.
 
+## Status (2026-05-18)
+
+Code-complete through D4; D5 partial. Not yet binary-verified — no
+DJGPP toolchain on the current dev box, so the cross build + dosiz
+run is a pending step (see WIP.md "What to run to verify").
+
+    D0  Toolchain + empty build            committed (28ac42d)
+    D1  Headless trace2 gate wiring        committed (ddf9a1b)
+    D2  VBE display + cursor               code complete (2623ce0)
+    D3  Mouse + keyboard                   code complete (2623ce0)
+    D4  Filesystem + snapshot              inherited from D1
+                                           (PosixFileSystem alias)
+    D5  Packaging                          ZIP target added; release
+                                           publish pending verify
+    D6  JIT                                deferred to Phase 6
+
+What landed in 2623ce0: `app/dos/` — `VbeDisplay`, `MouseInt33`,
+`KbdInt16`, `Launcher`, `st80_dos_main`, its `CMakeLists.txt`,
+`app/dos/README.md`; `cmake/DosPackaging.cmake` (opt-in
+`st80_dos_zip`); root `CMakeLists.txt` `if(DJGPP)` now adds
+`app/dos` + the packaging include. All additive + gated — a host
+configure never enters the DJGPP branch, verified by reconfiguring
+the MSVC build (clean) and rebuilding `st80core` + tools + the
+Windows port (green). (`core_smoke_test` segfaults on this MSVC
+Debug host — pre-existing and unrelated: the commit changes zero
+`src/core` / `src/include` / `tests` files, so those binaries are
+byte-identical to the pre-change tree.)
+
+Still open before a tagged DOS release: cross-compile under DJGPP,
+run the trace2 gate under dosiz (D1 exit), boot to the desktop
+under `dosiz --window` and screenshot it (D2/D3 exit), snapshot
+round-trip (D4 exit), 86Box + FreeDOS smoke (D5 exit).
+
 ## Goal & non-goals
 
 **Goal.** A single-file `st80.exe` (DJGPP COFF with DPMI stub) that
