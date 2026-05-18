@@ -86,9 +86,11 @@ endif()
 # See docs/dos-plan.md.
 if(DJGPP)
     add_subdirectory(src/platform/dos)
-    # app/dos/ lands in Phase D2 with the VBE frontend. Until then,
-    # st80_dos alone compiles and is enough to link st80_run against
-    # for the headless trace2 gate (Phase D1).
+    add_subdirectory(app/dos)
+    # Opt-in real-DOS ZIP (target: st80_dos_zip). Not wired into the
+    # default build or any install component — see docs/dos-plan.md
+    # Phase D5. Primary distribution is just st80.exe + snapshot.im.
+    include(cmake/DosPackaging.cmake)
 endif()
 
 # --- packaging ------------------------------------------------------
