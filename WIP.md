@@ -100,29 +100,53 @@ not the code). Worth a separate look on its own.
     # => build-dos/tools/st80_run.exe + build-dos/app/dos/st80.exe
     #    both: objdump -f => "file format coff-go32-exe"
 
-## dosiz blocker (file upstream in C:\temp\src\dosiz)
+## dosiz exec bug — ROOT-CAUSED + FIXED upstream
 
-`dosiz --version` / `--help` work. Running ANY program hangs: zero
-stdout, `--verbose` prints nothing, process uses ~0.04 s CPU over a
-full timeout (blocked on I/O, not spinning), never exits. Verified
-not our code — dosiz's OWN shipped fixtures hang too:
+Symptom was: dosiz hung with zero output for ANY program (even a
+trivial DJGPP `printf`, and dosiz's own fixtures). The earlier
+"~0 CPU / blocked on I/O" read was a `timeout`-wrapper artifact; a
+gdb backtrace showed the CPU core actually spinning, and a dosiz
+trace (read while alive — output was just buffering lost on kill)
+showed an infinite `INT 31h AX=0300 → INT 21h AH=3F` read loop:
+the go32-v2 stub re-reading its own COFF payload forever.
 
-    export PATH="/c/s/msys64/mingw64/bin:$PATH"   # dosiz's DLLs
-    cd /c/temp/src/dosiz
-    timeout 20 ./build/dosiz.exe tests/DJ_PRINTF.EXE   # rc=124, 0 lines
-    timeout 20 ./build/dosiz.exe tests/DJ_WRITE.EXE    # rc=124, 0 lines
+Root cause: dosiz's three guest-file `::open()` sites had no
+`O_BINARY`. POSIX ignores it (Linux/macOS fine — its DJGPP suite
+is green there), but on Windows the CRT defaults to TEXT mode and
+`::read()` returns EOF at the first 0x1A byte → any COFF/MZ image
+load short-reads and the stub spins.
 
-Minimal repro independent of st80: a trivial DJGPP `printf("hi")`
-(`/c/s/st80t/HI.EXE`) also hangs. Likely a dosiz Windows-headless
-console/boot block (cf. c-toolchain-guide.md:130 "FreeCOM hangs
-silently after any external spawn"). Fix dosiz, then run the gate:
+Fixed in dosiz `src/bridge.cc` (O_BINARY shim + the 3 opens),
+committed and pushed to dosiz origin/main as `ea3417c`. Verified:
+dosiz's own DJGPP regression suite went from 0 (total hang) to
+**11/14 PASS** on Windows (DJ_PRINTF/WRITE/ARGV/ENV/MALLOC/STDIN/
+EXEC/BIGTEST/…); a trivial DJGPP hello runs clean.
 
-    cd /c/s/st80t   # 8.3-clean staging: ST80RUN.EXE ST80.EXE SNAPSHOT.IM
+## Remaining: st80_run #GP under dosiz/Windows (separate, narrower)
+
+With execution fixed, `st80_run.exe` now loads + starts under
+dosiz (its whole COFF load completes — opens, header reads,
+payload reads, closes the .exe) but then faults very early:
+`#GP` (vec 13) at CS:EIP `0037:000019f1`, instruction `07`
+(`POP ES`) popping a garbage `0xffff` selector, before `main`.
+HI.EXE (tiny COFF) is fine; st80_run.exe (≈805 KB COFF, loads a
+596 KB image) is not — a size/layout-dependent dosiz-Windows
+bug, correlated with the 3 still-failing suite tests
+(DJ_FILE / DJ_SIGNAL / EMS_PROBE — all narrow feature/edge
+bugs, NOT the global-hang that is now fixed). This is a distinct
+follow-up dosiz investigation, not the execution blocker.
+
+The st80 DOS port itself builds correctly (coff-go32-exe). Re-run
+the gate once the residual dosiz-Windows file/DPMI bug is fixed,
+or on Linux/macOS CI where dosiz's suite is green:
+
+    cd /c/s/st80t   # 8.3-clean: ST80RUN.EXE ST80.EXE SNAPSHOT.IM
     export PATH="/c/s/msys64/mingw64/bin:$PATH"
-    /c/temp/src/dosiz/build/dosiz.exe ST80RUN.EXE -n 499 SNAPSHOT.IM
-    # diff its stdout vs the awk-extracted reference/xerox-image/trace2
-    /c/temp/src/dosiz/build/dosiz.exe ST80.EXE --probe SNAPSHOT.IM
-    /c/temp/src/dosiz/build/dosiz.exe --window ST80.EXE SNAPSHOT.IM
+    DOSIZ_DPMI_RING3=1 /c/temp/src/dosiz/build/dosiz.exe \
+        ST80RUN.EXE -n 499 SNAPSHOT.IM
+    # diff stdout vs awk-extracted reference/xerox-image/trace2
+    DOSIZ_DPMI_RING3=1 .../dosiz.exe ST80.EXE --probe SNAPSHOT.IM
+    DOSIZ_DPMI_RING3=1 .../dosiz.exe --window ST80.EXE SNAPSHOT.IM
 
 NOTE dosiz maps host CWD → C:\ and is 8.3-only without a .cfg, so
 paths like `build-dos/` / `reference/xerox-image/VirtualImage` are

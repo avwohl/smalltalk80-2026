@@ -71,16 +71,27 @@ DJGPP path had never actually been compiled (commit ed30b3a):
   4. Core std::nanf isn't in DJGPP std::; swapped the failure-path
      sentinel for std::numeric_limits<float>::quiet_NaN().
 
-Runtime verification (trace2 gate, --probe, --window) is **blocked
-by dosiz on this Windows host**, not by the port: dosiz --version /
---help work, but dosiz hangs silently with zero output for *any*
-program — including its OWN shipped fixtures (tests/DJ_PRINTF.EXE,
-DJ_WRITE.EXE) run exactly per dosiz's run.sh. `time` shows ~0.04 s
-CPU over a full timeout → dosiz is blocked on I/O during emulator
-boot, independent of our binary. Per this plan's "dosiz upstream
-coordination" policy this is filed against C:\temp\src\dosiz, not
-worked around here. Re-test the gate/probe once dosiz runs programs
-on this host (or on Linux/macOS CI where its own suite is green).
+Runtime verification was blocked by a dosiz Windows bug, now
+**root-caused and fixed upstream** (per this plan's "dosiz upstream
+coordination" policy — fix dosiz, don't work around in st80).
+dosiz hung with zero output for *any* DJGPP program because its
+guest-file `::open()` sites lacked `O_BINARY`: on Windows the CRT
+defaults to text mode and `::read()` hits 0x1A→EOF, so the
+go32-v2 stub spun forever re-reading its own COFF payload. Fixed
+in dosiz `src/bridge.cc` (commit `ea3417c`, pushed to dosiz
+origin/main). dosiz's own DJGPP suite went 0 → 11/14 PASS on
+Windows; a trivial DJGPP hello runs clean.
+
+Residual (separate, narrower): `st80_run.exe` now loads + starts
+under dosiz but `#GP`s very early (`POP ES` of a garbage selector
+at CS:EIP 0037:000019f1, before main). Tiny COFF (hello) is fine;
+the ≈805 KB st80_run is not — a size/layout-dependent
+dosiz-Windows bug, correlated with the 3 still-failing dosiz
+suite tests (DJ_FILE/DJ_SIGNAL/EMS_PROBE). Distinct from the
+fixed global hang; tracked for a follow-up dosiz dive. The st80
+port itself builds correctly. Re-run the gate/probe/window once
+that residual is fixed, or on Linux/macOS CI (dosiz suite green
+there). Repro + commands in WIP.md.
 
     D0  Toolchain + empty build            committed (28ac42d)
     D1  Headless trace2 gate wiring        committed (ddf9a1b)
