@@ -16,6 +16,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <memory>
 #include <string>
 
 #include "ObjectMemory.hpp"
@@ -39,7 +40,11 @@ int main(int argc, char **argv) {
 
     st80::HostFileSystem fs(dir);
     st80::HeadlessHal hal;
-    st80::ObjectMemory memory(&hal);
+    // Heap-allocate: ObjectMemory embeds RealWordMemory (2 MiB by
+    // value); a stack local underflows DJGPP's small default stack
+    // on the DOS port (see tools/st80_run.cpp for the full story).
+    auto memoryPtr = std::make_unique<st80::ObjectMemory>(&hal);
+    auto &memory = *memoryPtr;
 
     std::printf("st80_probe: loading %s (dir=%s name=%s)\n",
                 fullPath.c_str(), dir.c_str(), name.c_str());

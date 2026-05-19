@@ -21,6 +21,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 #include <string>
 
 #include "Interpreter.hpp"
@@ -61,12 +62,19 @@ int main(int argc, char **argv) {
     st80::HostFileSystem fs(dir);
     st80::HeadlessHal hal;
     hal.set_image_name(name.c_str());
-    st80::Interpreter vm(&hal, &fs);
+    // Interpreter embeds ObjectMemory -> RealWordMemory, a 2 MiB
+    // by-value array. A stack local here means a ~2 MiB frame, which
+    // is fine on hosts with a multi-MiB default stack (macOS/Linux)
+    // but underflows DJGPP's small default stack on the DOS port
+    // (observed: `sub esp,0x205150` wraps ESP, the next ret runs off
+    // into zeroed memory -> #GP). Heap-allocate it; the VM is a
+    // long-lived singleton anyway and DosBridge already does this.
+    auto vm = std::make_unique<st80::Interpreter>(&hal, &fs);
 
     std::fprintf(stderr, "st80_run: initializing (image=%s, dir=%s, cycles=%d)\n",
                  name.c_str(), dir.c_str(), cycles);
 
-    if (!vm.init()) {
+    if (!vm->init()) {
         std::fprintf(stderr, "st80_run: Interpreter::init() FAILED\n");
         return 2;
     }
@@ -74,8 +82,8 @@ int main(int argc, char **argv) {
     std::fprintf(stderr, "st80_run: init OK; cycling...\n");
 
     for (int i = 1; i <= cycles; i++) {
-        vm.cycle();
-        const int bc = vm.lastBytecode();
+        vm->cycle();
+        const int bc = vm->lastBytecode();
         std::printf("%d\n", bc);
     }
 

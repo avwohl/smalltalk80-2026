@@ -24,6 +24,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -108,7 +109,11 @@ int cmdCheck(const std::string &path) {
     const auto p = splitPath(path);
     st80::HostFileSystem fs(p.dir);
     st80::HeadlessHal hal;
-    st80::ObjectMemory memory(&hal);
+    // Heap-allocate: ObjectMemory embeds 2 MiB RealWordMemory by
+    // value; a stack local underflows DJGPP's small default stack on
+    // the DOS port (see tools/st80_run.cpp).
+    auto memoryPtr = std::make_unique<st80::ObjectMemory>(&hal);
+    auto &memory = *memoryPtr;
 
     if (!memory.loadSnapshot(&fs, p.name.c_str())) {
         std::fprintf(stderr, "st80_validate: loadSnapshot FAILED\n");
@@ -135,7 +140,11 @@ int cmdShaSum(const std::string &path) {
     const auto p = splitPath(path);
     st80::HostFileSystem fs(p.dir);
     st80::HeadlessHal hal;
-    st80::ObjectMemory memory(&hal);
+    // Heap-allocate: ObjectMemory embeds 2 MiB RealWordMemory by
+    // value; a stack local underflows DJGPP's small default stack on
+    // the DOS port (see tools/st80_run.cpp).
+    auto memoryPtr = std::make_unique<st80::ObjectMemory>(&hal);
+    auto &memory = *memoryPtr;
 
     if (!memory.loadSnapshot(&fs, p.name.c_str())) {
         std::fprintf(stderr, "st80_validate: loadSnapshot FAILED\n");
