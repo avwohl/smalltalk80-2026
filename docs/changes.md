@@ -67,7 +67,11 @@ check asserts exit 0, exactly N bytecodes, **and** a pinned
 SHA-256 (one 64-char constant, no gold file). The pin is
 identical on the native host and inside dosiz (`c2f447e7…`),
 so it guards the interpreter, the loader, and dosiz's CPU/DPMI
-emulation over a long run in a single constant.
+emulation over a long run in a single constant. An opt-in
+deeper tier (`ST80_DEEP_CYCLES`/`ST80_DEEP_SHA256`) is verified
+byte-for-byte native == dosiz at 2 000 000 cycles — millions of
+cycles of emulated steady-state execution, bit-exact, no
+crash/assert/drift.
 
 **One-command DOS-port gate.** `tests/dos_dosiz_gate.sh`
 (CTest `dos_dosiz_gate`, UNIX/CI) stages the DJGPP binaries and

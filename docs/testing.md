@@ -46,6 +46,19 @@ All under `tests/CMakeLists.txt`:
    UNIX/CI (bash); the DJGPP build runs the same script under dosiz
    via the gate below, against the same pin.
 
+   The default 250 000 is the fast tier (~2 s host, a few min in
+   dosiz). A much deeper stress run is opt-in via the existing
+   overrides — `ST80_DEEP_CYCLES` + the matching `ST80_DEEP_SHA256`
+   — kept out of the routine gate so CI stays quick. The 2 000 000
+   -cycle tier (well into steady-state scheduler + multiple GC
+   passes, ~8x the default) has been verified byte-for-byte
+   native == dosiz (2026-05-19): exit 0, 2 000 000 lines, sha256
+   `33d73dcc435b2bba0341108d474837964d551415a7e5442a0e3642e553e52212`
+   identical on the host and inside dosiz — no crash, assert, or
+   drift over millions of cycles of emulated execution. Run it with
+   `ST80_DEEP_CYCLES=2000000
+   ST80_DEEP_SHA256=33d73dcc…e52212 bash tests/dos_dosiz_gate.sh …`
+
 4. **`st80_gui_test`** — headless "fake GUI" runner, the in-repo
    analog of `avwohl/pharo-headless-test` (README "Related").
    pharo-headless-test installs an in-memory Display Form, injects
