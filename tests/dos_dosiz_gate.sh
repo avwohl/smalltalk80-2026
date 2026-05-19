@@ -52,6 +52,12 @@ TRACE2="${3:-}"
 DOSIZ_BIN="${4:-${DOSIZ_BIN:-/c/temp/src/dosiz/build/dosiz.exe}}"
 DOSIZ_DLL_PATH="${DOSIZ_DLL_PATH:-/c/s/msys64/mingw64/bin}"
 DOSIZ_TIMEOUT="${DOSIZ_TIMEOUT:-300}"
+ST80_DEEP_CYCLES="${ST80_DEEP_CYCLES:-250000}"
+# Deterministic pin (HeadlessHal counter clock): the 250000-cycle
+# stream is byte-identical native and under dosiz. Keep in sync with
+# ST80_DEEP_SHA256 in tests/CMakeLists.txt.
+ST80_DEEP_SHA256="${ST80_DEEP_SHA256:-c2f447e7b109a00177448bd1315e01a01f98a096fea760fe9276d9ba86f15f4c}"
+export ST80_DEEP_SHA256
 HERE="$(cd "$(dirname "$0")" && pwd)"
 
 skip() { echo "dos_dosiz_gate: SKIP ($1)"; exit 77; }
@@ -120,16 +126,17 @@ else
     bad "trace2 (rc=$rc)"
 fi
 
-# --- 2. deep-run stability under dosiz -----------------------------
+# --- 2. deep-run byte-for-byte under dosiz -------------------------
 # trace2 only pins 499 cycles; this drives st80_run far past the
-# snapshot point and asserts a clean completion — a long sustained
-# run is where a dosiz DPMI/memory edge or a late primitive would
-# bite.
+# snapshot point. HeadlessHal is deterministic, so ST80_DEEP_SHA256
+# (exported above) makes this a byte-for-byte gate vs the native
+# reference — a long sustained run is where a dosiz DPMI/memory edge
+# or a late primitive would bite, and any drift fails the pin.
 echo "dos_dosiz_gate: [2/4] deep-run ..."
 if ( cd "$STAGE" && bash "$HERE/deeprun_check.sh" \
-        SNAPSHOT.IM ST80RUN.EXE "${ST80_DEEP_CYCLES:-250000}" "$RUNNER" ) \
+        SNAPSHOT.IM ST80RUN.EXE "$ST80_DEEP_CYCLES" "$RUNNER" ) \
         > "$STAGE/deep.log" 2>&1; then
-    pass "deep-run ($(grep -o '[0-9]* cycles ran clean' "$STAGE/deep.log" | head -1))"
+    pass "deep-run ($(grep -oE '[0-9]+ cycles[^)]*' "$STAGE/deep.log" | head -1))"
 else
     bad "deep-run (rc=$?)"; sed 's/^/    /' "$STAGE/deep.log"
 fi

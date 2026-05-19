@@ -34,18 +34,31 @@ if(UNIX)
     )
     set_tests_properties(trace2_check PROPERTIES SKIP_RETURN_CODE 77)
 
-    # Sustained-execution stability: trace2 only pins 499 cycles;
-    # this runs st80_run deep past the snapshot/scheduler entry and
-    # asserts it completes (exit 0 + N bytecodes, no crash/hang).
+    # Sustained-execution gate: trace2 only pins 499 cycles. This
+    # runs st80_run 500x deeper, past the snapshot/scheduler entry,
+    # and — because HeadlessHal is fully deterministic (counter
+    # clock, no wall time / input / rand) — asserts the stream is
+    # byte-for-byte the pinned reference, not merely "didn't crash".
+    # The pin is the SHA-256 of the CR-stripped 250000-cycle stream
+    # for reference/xerox-image/VirtualImage; it is identical on the
+    # native host and inside dosiz (verified 2026-05-19), so the one
+    # constant guards the interpreter, the loader, and dosiz's
+    # CPU/DPMI emulation over a long run. Regenerate on an
+    # intentional interpreter change:
+    #   st80_run -n 250000 <image> | tr -d '\r' | sha256sum
+    set(ST80_DEEP_CYCLES 250000)
+    set(ST80_DEEP_SHA256
+        "c2f447e7b109a00177448bd1315e01a01f98a096fea760fe9276d9ba86f15f4c")
     add_test(
         NAME st80_run_deep
         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/deeprun_check.sh
                 ${CMAKE_SOURCE_DIR}/reference/xerox-image/VirtualImage
                 $<TARGET_FILE:st80_run>
-                250000
+                ${ST80_DEEP_CYCLES}
     )
     set_tests_properties(st80_run_deep PROPERTIES
-        SKIP_RETURN_CODE 77 TIMEOUT 300)
+        SKIP_RETURN_CODE 77 TIMEOUT 300
+        ENVIRONMENT "ST80_DEEP_SHA256=${ST80_DEEP_SHA256}")
 endif()
 
 # Headless "fake GUI" gate (pharo-headless-test analog, tools/

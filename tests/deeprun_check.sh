@@ -21,7 +21,15 @@
 # Usage:
 #   deeprun_check.sh <image> <st80_run> <cycles> [RUNNER]
 #
-# Exit: 0 ran cleanly · 1 crashed/short · 77 prerequisites absent.
+# Env:
+#   ST80_DEEP_SHA256   if set, additionally assert the (CR-stripped)
+#                      bytecode stream hashes to exactly this value —
+#                      upgrades the liveness check to a byte-for-byte
+#                      content gate. Deterministic so the pin is
+#                      identical native and under dosiz.
+#
+# Exit: 0 ran cleanly (and matched the pin if set) · 1 crashed /
+# short / content drifted · 77 prerequisites absent.
 #
 # Copyright (c) 2026 Aaron Wohl. MIT License.
 set -uo pipefail
@@ -63,5 +71,33 @@ if [ "$LINES" -ne "$CYCLES" ]; then
     echo "deeprun_check: FAIL — expected $CYCLES bytecodes, got $LINES (truncated/hung)"
     exit 1
 fi
-echo "deeprun_check: OK ($CYCLES cycles ran clean)"
+
+# Content gate. HeadlessHal is fully deterministic — get_msclock() is
+# a plain ticks_++ counter (not wall time), epoch time fixed, no input
+# or rand — so st80_run on a fixed image emits a bit-exact stream
+# regardless of host or emulator. With ST80_DEEP_SHA256 pinned (the
+# Xerox v2 image at this cycle count) this becomes a 250k-cycle
+# byte-for-byte gate — ~500x deeper than trace2's 499 — via one
+# constant, no megabyte gold file. The same pin holds on the native
+# host and inside dosiz (proven: c2f447e7…), so it guards the
+# interpreter, the image loader, AND dosiz's CPU/DPMI emulation over
+# sustained execution.  CR is stripped first so LF (native) and CRLF
+# (DOS text-mode) hash identically.
+EXPECT_SHA="${ST80_DEEP_SHA256:-}"
+if [ -n "$EXPECT_SHA" ]; then
+    if   command -v sha256sum >/dev/null 2>&1; then SHA_CMD="sha256sum"
+    elif command -v shasum    >/dev/null 2>&1; then SHA_CMD="shasum -a 256"
+    else echo "deeprun_check: OK ($CYCLES cycles ran clean; no sha tool — content unverified)"; exit 0
+    fi
+    GOT_SHA=$(tr -d '\r' < "$ACTUAL" | $SHA_CMD | cut -d' ' -f1)
+    if [ "$GOT_SHA" != "$EXPECT_SHA" ]; then
+        echo "deeprun_check: FAIL — $CYCLES-cycle stream drifted"
+        echo "  expected sha256 $EXPECT_SHA"
+        echo "  got      sha256 $GOT_SHA"
+        exit 1
+    fi
+    echo "deeprun_check: OK ($CYCLES cycles, byte-for-byte vs pinned reference)"
+    exit 0
+fi
+echo "deeprun_check: OK ($CYCLES cycles ran clean; content unpinned)"
 exit 0

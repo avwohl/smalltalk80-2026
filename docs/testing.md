@@ -26,16 +26,25 @@ All under `tests/CMakeLists.txt`:
    interpreter or image loader blows up here first. Byte-for-byte
    match is required. Skips if the image or trace file is absent.
 
-3a. **`st80_run_deep`** (`deeprun_check.sh`) — sustained-execution
-   stability. `trace2` only pins the first 499 (deterministic boot)
-   cycles; this drives `st80_run` to 250 000 cycles, well past the
-   snapshot/scheduler entry, and asserts a clean completion (exit 0
-   **and** exactly N bytecodes — not crashed, asserted, hung, or
-   truncated). Not a determinism check (post-snapshot timing
-   legitimately differs native vs dosiz); it's where a late
-   primitive or a dosiz DPMI/memory edge that only a long run trips
-   would surface. CTest on UNIX/CI (bash); the DJGPP build runs the
-   same script under dosiz via the gate below.
+3a. **`st80_run_deep`** (`deeprun_check.sh`) — deep byte-for-byte
+   gate. `trace2` only pins the first 499 (boot) cycles; this drives
+   `st80_run` to 250 000 cycles, ~500x deeper, well past the
+   snapshot/scheduler entry. `HeadlessHal` is fully deterministic
+   (`get_msclock()` is a `ticks_++` counter, not wall time; epoch
+   time fixed; no input/rand), so the entire stream is bit-exact
+   regardless of host or emulator — it does **not** drift native vs
+   dosiz. The check asserts exit 0, exactly N bytecodes, **and**
+   that the CR-stripped stream hashes to a pinned SHA-256
+   (`ST80_DEEP_SHA256`, single 64-char constant — no megabyte gold
+   file). That one pin is identical on the native host and inside
+   dosiz (`c2f447e7…`, verified 2026-05-19), so it simultaneously
+   guards the interpreter, the image loader, and dosiz's CPU/DPMI
+   emulation over a long sustained run — where a late primitive or
+   a dosiz memory edge would surface. Regenerate the pin only on an
+   intentional interpreter change:
+   `st80_run -n 250000 <image> | tr -d '\r' | sha256sum`. CTest on
+   UNIX/CI (bash); the DJGPP build runs the same script under dosiz
+   via the gate below, against the same pin.
 
 4. **`st80_gui_test`** — headless "fake GUI" runner, the in-repo
    analog of `avwohl/pharo-headless-test` (README "Related").
@@ -78,8 +87,9 @@ All under `tests/CMakeLists.txt`:
    under dosiz" gate (`tests/dos_dosiz_gate.sh`). Stages the
    DJGPP-cross binaries into a temp 8.3 dir and runs all four
    DOS checks inside dosiz in one shot: trace2 byte-for-byte,
-   deep-run (250 k cycles), `st80_validate roundtrip`, and
-   `st80_gui_test`. This is the automated form of the
+   deep-run (250 k cycles, byte-for-byte vs the pinned native
+   reference), `st80_validate roundtrip`, and `st80_gui_test`.
+   This is the automated form of the
    verification previously done by hand each iteration — the
    regression guard for the DOS port and for dosiz itself. CTest
    on UNIX/CI (bash); behind the `ST80_DOS_BUILD_DIR` /
@@ -87,9 +97,9 @@ All under `tests/CMakeLists.txt`:
    DJGPP tree or dosiz is absent, so a host without the DOS
    toolchain stays green. On the Windows dev box it's run
    directly via git-bash (same as `trace2_check`). Current
-   result: 4/4 PASS (trace2 OK, 250 k cycles ran clean,
-   roundtrip digest `9db7adac…`, fake-GUI Δ4922) — every figure
-   identical to the native host.
+   result: 4/4 PASS (trace2 OK, 250 k cycles byte-for-byte vs
+   pin, roundtrip digest `9db7adac…`, fake-GUI Δ4922) — every
+   figure identical to the native host.
 
 ## What's available but not yet wired
 

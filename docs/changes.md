@@ -58,18 +58,23 @@ check` is now also a CTest (`st80_validate_check`). Both added
 only when the Xerox image is present; the DJGPP build runs the
 same commands under dosiz.
 
-**Sustained-execution gate.** `deeprun_check.sh` (CTest
-`st80_run_deep`) runs the interpreter 250 000 cycles — far past
-trace2's 499-cycle boot prefix — and asserts a clean completion
-(exit 0 + exactly N bytecodes). Catches late primitives / GC /
-dosiz DPMI-or-memory edges a long run trips. Verified clean on
-host and under dosiz.
+**Deep byte-for-byte gate.** `deeprun_check.sh` (CTest
+`st80_run_deep`) runs the interpreter 250 000 cycles — ~500×
+past trace2's 499-cycle boot prefix. Because `HeadlessHal` is
+fully deterministic (counter clock, no wall time/input/rand)
+the stream is bit-exact regardless of host or emulator, so the
+check asserts exit 0, exactly N bytecodes, **and** a pinned
+SHA-256 (one 64-char constant, no gold file). The pin is
+identical on the native host and inside dosiz (`c2f447e7…`),
+so it guards the interpreter, the loader, and dosiz's CPU/DPMI
+emulation over a long run in a single constant.
 
 **One-command DOS-port gate.** `tests/dos_dosiz_gate.sh`
 (CTest `dos_dosiz_gate`, UNIX/CI) stages the DJGPP binaries and
 runs trace2 + deep-run + snapshot-roundtrip + fake-GUI inside
 dosiz in a single shot — the automated form of the
-per-iteration manual verification. 4/4 PASS, every figure
+per-iteration manual verification. 4/4 PASS (incl. the 250 k
+deep-run byte-for-byte against the native pin), every figure
 identical to native; self-SKIPs where the DOS toolchain/dosiz
 are absent.
 
