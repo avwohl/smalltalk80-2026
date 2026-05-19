@@ -26,6 +26,17 @@ All under `tests/CMakeLists.txt`:
    interpreter or image loader blows up here first. Byte-for-byte
    match is required. Skips if the image or trace file is absent.
 
+3a. **`st80_run_deep`** (`deeprun_check.sh`) — sustained-execution
+   stability. `trace2` only pins the first 499 (deterministic boot)
+   cycles; this drives `st80_run` to 250 000 cycles, well past the
+   snapshot/scheduler entry, and asserts a clean completion (exit 0
+   **and** exactly N bytecodes — not crashed, asserted, hung, or
+   truncated). Not a determinism check (post-snapshot timing
+   legitimately differs native vs dosiz); it's where a late
+   primitive or a dosiz DPMI/memory edge that only a long run trips
+   would surface. CTest on UNIX/CI (bash); the DJGPP build runs the
+   same script under dosiz via the gate below.
+
 4. **`st80_gui_test`** — headless "fake GUI" runner, the in-repo
    analog of `avwohl/pharo-headless-test` (README "Related").
    pharo-headless-test installs an in-memory Display Form, injects
@@ -65,17 +76,18 @@ All under `tests/CMakeLists.txt`:
 
 7. **`dos_dosiz_gate`** — the consolidated "st80 works fully
    under dosiz" gate (`tests/dos_dosiz_gate.sh`). Stages the
-   DJGPP-cross binaries into a temp 8.3 dir and runs all three
+   DJGPP-cross binaries into a temp 8.3 dir and runs all four
    DOS checks inside dosiz in one shot: trace2 byte-for-byte,
-   `st80_validate roundtrip`, and `st80_gui_test`. This is the
-   automated form of the verification previously done by hand
-   each iteration — the regression guard for the DOS port and
-   for dosiz itself. CTest on UNIX/CI (bash); behind the
-   `ST80_DOS_BUILD_DIR` / `ST80_DOSIZ_BIN` cache vars and
-   self-SKIPs (77) when the DJGPP tree or dosiz is absent, so a
-   host without the DOS toolchain stays green. On the Windows
-   dev box it's run directly via git-bash (same as
-   `trace2_check`). Current result: 3/3 PASS (trace2 OK,
+   deep-run (250 k cycles), `st80_validate roundtrip`, and
+   `st80_gui_test`. This is the automated form of the
+   verification previously done by hand each iteration — the
+   regression guard for the DOS port and for dosiz itself. CTest
+   on UNIX/CI (bash); behind the `ST80_DOS_BUILD_DIR` /
+   `ST80_DOSIZ_BIN` cache vars and self-SKIPs (77) when the
+   DJGPP tree or dosiz is absent, so a host without the DOS
+   toolchain stays green. On the Windows dev box it's run
+   directly via git-bash (same as `trace2_check`). Current
+   result: 4/4 PASS (trace2 OK, 250 k cycles ran clean,
    roundtrip digest `9db7adac…`, fake-GUI Δ4922) — every figure
    identical to the native host.
 

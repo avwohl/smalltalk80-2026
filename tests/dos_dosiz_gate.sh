@@ -110,7 +110,7 @@ echo "dos_dosiz_gate: staging $STAGE  (dosiz=$DOSIZ_BIN)"
 # trace2_check.sh checks $ST80_RUN exists, builds the expected stream,
 # then runs `$RUNNER $ST80_RUN -n N SNAPSHOT.IM`. Run from $STAGE so
 # the bare 8.3 names resolve inside dosiz's C:\.
-echo "dos_dosiz_gate: [1/3] trace2 ..."
+echo "dos_dosiz_gate: [1/4] trace2 ..."
 if ( cd "$STAGE" && bash "$HERE/trace2_check.sh" \
         SNAPSHOT.IM "$TRACE2" ST80RUN.EXE "$RUNNER" ); then
     pass "trace2 byte-for-byte"
@@ -120,8 +120,22 @@ else
     bad "trace2 (rc=$rc)"
 fi
 
-# --- 2. snapshot save round-trip under dosiz -----------------------
-echo "dos_dosiz_gate: [2/3] snapshot roundtrip ..."
+# --- 2. deep-run stability under dosiz -----------------------------
+# trace2 only pins 499 cycles; this drives st80_run far past the
+# snapshot point and asserts a clean completion — a long sustained
+# run is where a dosiz DPMI/memory edge or a late primitive would
+# bite.
+echo "dos_dosiz_gate: [2/4] deep-run ..."
+if ( cd "$STAGE" && bash "$HERE/deeprun_check.sh" \
+        SNAPSHOT.IM ST80RUN.EXE "${ST80_DEEP_CYCLES:-250000}" "$RUNNER" ) \
+        > "$STAGE/deep.log" 2>&1; then
+    pass "deep-run ($(grep -o '[0-9]* cycles ran clean' "$STAGE/deep.log" | head -1))"
+else
+    bad "deep-run (rc=$?)"; sed 's/^/    /' "$STAGE/deep.log"
+fi
+
+# --- 3. snapshot save round-trip under dosiz -----------------------
+echo "dos_dosiz_gate: [3/4] snapshot roundtrip ..."
 if ( cd "$STAGE" && "$RUNNER" ST80VAL.EXE roundtrip SNAPSHOT.IM ) \
         > "$STAGE/rt.log" 2>&1; then
     pass "snapshot roundtrip ($(grep -o 'digest [0-9a-f]*' "$STAGE/rt.log" | head -1))"
@@ -129,8 +143,8 @@ else
     bad "snapshot roundtrip (rc=$?)"; sed 's/^/    /' "$STAGE/rt.log"
 fi
 
-# --- 3. headless fake-GUI under dosiz ------------------------------
-echo "dos_dosiz_gate: [3/3] fake-GUI ..."
+# --- 4. headless fake-GUI under dosiz ------------------------------
+echo "dos_dosiz_gate: [4/4] fake-GUI ..."
 if ( cd "$STAGE" && "$RUNNER" ST80GT.EXE SNAPSHOT.IM . ) \
         > "$STAGE/gui.log" 2>&1; then
     pass "fake-GUI ($(grep -o 'pixel delta=[0-9]*' "$STAGE/gui.log" | head -1))"
@@ -139,7 +153,7 @@ else
 fi
 
 if [ "$fail" = 0 ]; then
-    echo "dos_dosiz_gate: OK — st80 works fully under dosiz (3/3)"
+    echo "dos_dosiz_gate: OK — st80 works fully under dosiz (4/4)"
     exit 0
 fi
 echo "dos_dosiz_gate: FAIL — see above"

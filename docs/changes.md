@@ -58,12 +58,20 @@ check` is now also a CTest (`st80_validate_check`). Both added
 only when the Xerox image is present; the DJGPP build runs the
 same commands under dosiz.
 
+**Sustained-execution gate.** `deeprun_check.sh` (CTest
+`st80_run_deep`) runs the interpreter 250 000 cycles — far past
+trace2's 499-cycle boot prefix — and asserts a clean completion
+(exit 0 + exactly N bytecodes). Catches late primitives / GC /
+dosiz DPMI-or-memory edges a long run trips. Verified clean on
+host and under dosiz.
+
 **One-command DOS-port gate.** `tests/dos_dosiz_gate.sh`
 (CTest `dos_dosiz_gate`, UNIX/CI) stages the DJGPP binaries and
-runs trace2 + snapshot-roundtrip + fake-GUI inside dosiz in a
-single shot — the automated form of the per-iteration manual
-verification. 3/3 PASS, every figure identical to native;
-self-SKIPs where the DOS toolchain/dosiz are absent.
+runs trace2 + deep-run + snapshot-roundtrip + fake-GUI inside
+dosiz in a single shot — the automated form of the
+per-iteration manual verification. 4/4 PASS, every figure
+identical to native; self-SKIPs where the DOS toolchain/dosiz
+are absent.
 
 (Companion dosiz emulator fixes for the DOS port: AH=3F
 block-read fast path, binary host stdio on Windows, callback

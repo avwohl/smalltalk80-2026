@@ -33,6 +33,19 @@ if(UNIX)
                 $<TARGET_FILE:st80_run>
     )
     set_tests_properties(trace2_check PROPERTIES SKIP_RETURN_CODE 77)
+
+    # Sustained-execution stability: trace2 only pins 499 cycles;
+    # this runs st80_run deep past the snapshot/scheduler entry and
+    # asserts it completes (exit 0 + N bytecodes, no crash/hang).
+    add_test(
+        NAME st80_run_deep
+        COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/deeprun_check.sh
+                ${CMAKE_SOURCE_DIR}/reference/xerox-image/VirtualImage
+                $<TARGET_FILE:st80_run>
+                250000
+    )
+    set_tests_properties(st80_run_deep PROPERTIES
+        SKIP_RETURN_CODE 77 TIMEOUT 300)
 endif()
 
 # Headless "fake GUI" gate (pharo-headless-test analog, tools/
