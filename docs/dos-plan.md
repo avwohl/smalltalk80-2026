@@ -104,6 +104,14 @@ byte-for-byte)`. Four fixes, each at root cause:
      DOS text-mode `st80_run.exe` (correctly CRLF) compares clean
      against the Unix-LF reference. No-op on the native path.
 
+All three headless tools verified under dosiz the same day:
+`st80_probe` → loadSnapshot OK (oopsLeft 14375, coreLeft 723822
+words); `st80_validate check` → 18391 live objects, 0 problems.
+Definitive: `st80_validate shasum` cross-checked native (MSVC)
+vs DJGPP-under-dosiz — all 18391 per-object SHA-256 hashes
+IDENTICAL. The image loads bit-for-bit identically and the
+interpreter is byte-exact under dosiz.
+
 The earlier `#GP` was an st80 stack bug (2 MiB RealWordMemory as a
 stack local underflowing DJGPP's small stack), already fixed by
 heap-allocating the VM (commit 9a9b1c8). dosiz's own DJGPP suite
