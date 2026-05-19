@@ -49,9 +49,38 @@ correct. Noted and set aside.
 
 ## Status (2026-05-18)
 
-Code-complete through D4; D5 partial. Not yet binary-verified — no
-DJGPP toolchain on the current dev box, so the cross build + dosiz
-run is a pending step (see WIP.md "What to run to verify").
+Code-complete through D4; D5 partial. **The DJGPP cross-build is now
+verified**: andrewwutw/build-djgpp v3.4 (GCC 12.2.0, installed at
+C:\s\djgpp) builds libst80core.a, libst80_dos.a, st80_run.exe and
+st80.exe — all genuine `coff-go32-exe` go32-v2 DPMI binaries
+(objdump-confirmed). Getting there required fixing four real
+blockers the earlier "D0/D1 committed" claim had masked because the
+DJGPP path had never actually been compiled (commit ed30b3a):
+
+  1. Modern CMake ships no Platform/MSDOS and never sets `DJGPP`,
+     so the whole if(DJGPP) gate was dead. Added
+     cmake/Platform/MSDOS.cmake + a module-path hook in the
+     toolchain file.
+  2. Root CMakeLists forced -std=c++17 + PIC globally, overriding
+     the toolchain; DJGPP DOS headers are hidden under
+     __STRICT_ANSI__. Gated both on NOT DJGPP.
+  3. Risk #1 realised: DJGPP --disable-threads libstdc++ has no
+     std::mutex. Added single-threaded src/platform/dos/
+     EventQueue.hpp (shadows the common one by include order) and
+     dropped DosHal's unneeded mutex.
+  4. Core std::nanf isn't in DJGPP std::; swapped the failure-path
+     sentinel for std::numeric_limits<float>::quiet_NaN().
+
+Runtime verification (trace2 gate, --probe, --window) is **blocked
+by dosiz on this Windows host**, not by the port: dosiz --version /
+--help work, but dosiz hangs silently with zero output for *any*
+program — including its OWN shipped fixtures (tests/DJ_PRINTF.EXE,
+DJ_WRITE.EXE) run exactly per dosiz's run.sh. `time` shows ~0.04 s
+CPU over a full timeout → dosiz is blocked on I/O during emulator
+boot, independent of our binary. Per this plan's "dosiz upstream
+coordination" policy this is filed against C:\temp\src\dosiz, not
+worked around here. Re-test the gate/probe once dosiz runs programs
+on this host (or on Linux/macOS CI where its own suite is green).
 
     D0  Toolchain + empty build            committed (28ac42d)
     D1  Headless trace2 gate wiring        committed (ddf9a1b)
@@ -75,10 +104,13 @@ Debug host — pre-existing and unrelated: the commit changes zero
 `src/core` / `src/include` / `tests` files, so those binaries are
 byte-identical to the pre-change tree.)
 
-Still open before a tagged DOS release: cross-compile under DJGPP,
+Still open before a tagged DOS release (cross-compile is DONE):
 run the trace2 gate under dosiz (D1 exit), boot to the desktop
 under `dosiz --window` and screenshot it (D2/D3 exit), snapshot
-round-trip (D4 exit), 86Box + FreeDOS smoke (D5 exit).
+round-trip (D4 exit), 86Box + FreeDOS smoke (D5 exit). All four
+need a working program-execution path — blocked here by the dosiz
+hang above; unblock by fixing dosiz on this host, or run on
+Linux/macOS CI (dosiz's own DJGPP suite is green there).
 
 ## Goal & non-goals
 

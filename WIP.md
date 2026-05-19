@@ -6,10 +6,19 @@ Delete this file once Phase D5 ships (release published + verified).
 ## Where we are
 
 D0–D1 landed earlier (scaffolding + headless wiring). This session
-added the actual DOS-runnable frontend: **D2 (VBE display), D3
-(mouse + keyboard), D4 (filesystem, inherited)** are code-complete,
-and **D5** has its packaging target. Nothing binary-verified yet —
-no DJGPP toolchain on this box.
+added the actual DOS-runnable frontend (D2 VBE / D3 mouse+kbd / D4
+fs inherited / D5 packaging) **and got it genuinely cross-building
+under DJGPP**. The earlier "D0/D1 committed" claim was never
+compiled — the first real DJGPP build exposed four blockers, all
+now fixed (commit ed30b3a). `st80.exe` + `st80_run.exe` are real
+`coff-go32-exe` DPMI binaries.
+
+Runtime verification is **blocked by dosiz on this Windows box**
+(not the port): dosiz hangs with zero output for *any* program,
+including its own DJGPP fixtures. See "dosiz blocker" below.
+
+Toolchain is installed: `C:\s\djgpp` (andrewwutw v3.4, GCC 12.2.0).
+Xerox image fetched to `reference/xerox-image/`.
 
 Recent commits on `main`:
 
@@ -60,48 +69,65 @@ All DPMI/BIOS access uses the dosiz `dj_ems.c` convention: zeroed
 back. Confirmed available under dosiz per its
 `docs/c-toolchain-guide.md`.
 
-## "Don't break existing ports" — verified
+## "Don't break existing ports" — verified (twice)
 
-Reconfigured the MSVC `build/` (clean; the DJGPP block stays inert)
-and rebuilt `st80core`, `st80_run/probe/validate`, `st80_windows`,
-`st80-win` — all green. `git diff HEAD~1 HEAD` touches zero
-`src/core` / `src/include` / `tests` files.
+After the additive frontend commit AND after the ed30b3a build
+fixes (which touch `src/core/Interpreter.cpp` + root CMakeLists),
+reconfigured the MSVC `build/` (clean) and rebuilt `st80core`,
+`st80_run/probe/validate`, `st80_windows`, `st80-win` — all green.
+The CMake change is `if(DJGPP)/else()`; the else() branch is the
+exact pre-existing flags, so non-DOS ports are unchanged. The
+Interpreter.cpp change (`std::nanf("")` →
+`std::numeric_limits<float>::quiet_NaN()`) is a never-consumed
+failure-path sentinel — behaviour-identical on every toolchain.
 
-Caveat: `ctest` `core_smoke_test` SEGFAULTs (~4.3 s) on this MSVC
-Debug host. **Pre-existing and unrelated** — the core/test compiler
-inputs are byte-identical to the pre-change tree, so this commit
-cannot have caused it. Flagged here so it isn't mistaken for DOS
-fallout; worth a separate look on its own.
+Caveat: `ctest core_smoke_test` SEGFAULTs (~4.3 s) on this MSVC
+Debug host, **before and after** these changes, identically.
+Pre-existing and unrelated (it also can't even be launched from
+this Git Bash — exit 127 — an environment limitation of this box,
+not the code). Worth a separate look on its own.
 
-## What to run to verify (needs DJGPP + dosiz)
+## How to reproduce the build (verified working)
 
-Prereqs: DJGPP cross toolchain on PATH (`andrewwutw/build-djgpp`
-v3.4 — same one dosiz tests against). `dosiz.exe` already built at
-`C:\temp\src\dosiz\build\dosiz.exe` (confirmed present). Xerox v2
-image at `reference/xerox-image/VirtualImage` (+ `trace2` sibling).
-
+    export PATH="/c/s/djgpp/bin:$PATH"      # andrewwutw v3.4
+    CM=".../VS/.../CMake/bin/cmake.exe"      # cmake 3.20+
+    NINJA=".../VS/.../Ninja/ninja.exe"
     cd /c/temp/src/smalltalk80-2026
-    cmake -S . -B build-dos \
+    "$CM" --fresh -S . -B build-dos -G Ninja \
+          -DCMAKE_MAKE_PROGRAM="$NINJA" \
           -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-djgpp.cmake
-    cmake --build build-dos --target st80_run st80
+    "$CM" --build build-dos --target st80_run st80
+    # => build-dos/tools/st80_run.exe + build-dos/app/dos/st80.exe
+    #    both: objdump -f => "file format coff-go32-exe"
 
-    # D1 gate — byte-for-byte trace under dosiz
-    RUNNER="/c/temp/src/dosiz/build/dosiz.exe" \
-      tests/trace2_check.sh \
-      reference/xerox-image/VirtualImage \
-      reference/xerox-image/trace2 \
-      build-dos/tools/st80_run.exe
-    # expect: trace2_check: OK (499 bytecodes byte-for-byte)
+## dosiz blocker (file upstream in C:\temp\src\dosiz)
 
-    # D2 Risk-#2 probe (text mode, no graphics) — cheapest signal
-    dosiz build-dos/app/dos/st80.exe --probe \
-          reference/xerox-image/VirtualImage
-    # expect: a chosen VBE mode line + "INT 33h mouse: present"
+`dosiz --version` / `--help` work. Running ANY program hangs: zero
+stdout, `--verbose` prints nothing, process uses ~0.04 s CPU over a
+full timeout (blocked on I/O, not spinning), never exits. Verified
+not our code — dosiz's OWN shipped fixtures hang too:
 
-    # D2/D3 — boot to the desktop, screenshot, Read it
-    dosiz --window build-dos/app/dos/st80.exe \
-          reference/xerox-image/VirtualImage
-    # then scrot/screencapture/nircmd; Read the PNG; confirm pixels
+    export PATH="/c/s/msys64/mingw64/bin:$PATH"   # dosiz's DLLs
+    cd /c/temp/src/dosiz
+    timeout 20 ./build/dosiz.exe tests/DJ_PRINTF.EXE   # rc=124, 0 lines
+    timeout 20 ./build/dosiz.exe tests/DJ_WRITE.EXE    # rc=124, 0 lines
+
+Minimal repro independent of st80: a trivial DJGPP `printf("hi")`
+(`/c/s/st80t/HI.EXE`) also hangs. Likely a dosiz Windows-headless
+console/boot block (cf. c-toolchain-guide.md:130 "FreeCOM hangs
+silently after any external spawn"). Fix dosiz, then run the gate:
+
+    cd /c/s/st80t   # 8.3-clean staging: ST80RUN.EXE ST80.EXE SNAPSHOT.IM
+    export PATH="/c/s/msys64/mingw64/bin:$PATH"
+    /c/temp/src/dosiz/build/dosiz.exe ST80RUN.EXE -n 499 SNAPSHOT.IM
+    # diff its stdout vs the awk-extracted reference/xerox-image/trace2
+    /c/temp/src/dosiz/build/dosiz.exe ST80.EXE --probe SNAPSHOT.IM
+    /c/temp/src/dosiz/build/dosiz.exe --window ST80.EXE SNAPSHOT.IM
+
+NOTE dosiz maps host CWD → C:\ and is 8.3-only without a .cfg, so
+paths like `build-dos/` / `reference/xerox-image/VirtualImage` are
+NOT reachable from the guest — stage 8.3 names (done in C:\s\st80t).
+Or run the gate on Linux/macOS CI where dosiz's own suite is green.
 
 Likely failure modes, in order of interest:
   a. DJGPP not on PATH → cmake "compiler not found". Install it.
