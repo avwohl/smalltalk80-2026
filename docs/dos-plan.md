@@ -126,9 +126,9 @@ holds at 35/37 (EMS_PROBE/DJ_SIGNAL pre-existing, unrelated).
     D3  Mouse + keyboard                   mouse VERIFIED (cursor
                                            on screen under --window);
                                            kbd interaction pending
-    D4  Filesystem + snapshot              VERIFIED via D1 image
-                                           load (PosixFileSystem
-                                           +O_BINARY)
+    D4  Filesystem + snapshot              VERIFIED — load+save
+                                           round-trip byte-exact
+                                           under dosiz (2026-05-19)
     D5  Packaging                          ZIP target added; release
                                            publish pending verify
     D6  JIT                                deferred to Phase 6
@@ -161,12 +161,24 @@ sees the lock screen) and useful for CI. Two dosiz bugs were
 fixed to get here: the `--window` callback-pool exhaustion
 (CB_MAX 128→250, f18940c) and the screenshot trigger.
 
+D4 VERIFIED 2026-05-19: added `st80_validate resave <in> <out>`
+(load then `ObjectMemory::saveSnapshot` — exercises
+`create_file` + `write` = dosiz AH=40). Under dosiz: resave
+SNAPSHOT.IM→OUT.IM (596128 B, same size), then `shasum` of
+both is identical (18391 objects, byte-exact at object level —
+load→save→load round-trips). Stronger: the dosiz-written
+OUT.IM is **byte-for-byte identical** (`cmp`) to one written
+by the native MSVC build — the write path is bit-exact, not
+just semantically equivalent. No dosiz bug needed; AH=40 +
+O_BINARY create worked first try.
+
 Still open before a tagged DOS release: keyboard-interaction
-exercise (type into a workspace, doIt) to fully close D3;
-snapshot round-trip (D4 exit — loader proven byte-identical,
-the AH=40 save path still to exercise end-to-end); 86Box +
-FreeDOS smoke on real DPMI hardware (D5 exit). The headless
-port + GUI render are both done and verified under dosiz.
+exercise (type into a workspace, doIt) to fully close D3 —
+needs keystroke injection into a non-interactive dosiz session
+(likely a scripted-keystroke dosiz feature, same pattern as
+the screenshot one); 86Box + FreeDOS smoke on real DPMI
+hardware (D5 exit). Headless port, GUI render, and snapshot
+save round-trip are all done and verified under dosiz.
 
 ## Goal & non-goals
 

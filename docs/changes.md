@@ -28,6 +28,13 @@ Headless tools also all pass under dosiz: `st80_validate
 shasum` proves all 18391 objects load bit-identically vs the
 native build.
 
+**Snapshot save round-trips byte-exact under dosiz (D4).** New
+`st80_validate resave <in> <out>` (load → `saveSnapshot`)
+exercises the write path. Under dosiz, resave→reload→`shasum`
+is identical to the original (18391 objects), and the
+dosiz-written image is byte-for-byte identical to one written
+by the native build.
+
 (Companion dosiz emulator fixes for the DOS port: AH=3F
 block-read fast path, binary host stdio on Windows, callback
 pool CB_MAX 128→250 to fix `--window`, and a programmatic

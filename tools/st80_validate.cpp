@@ -179,12 +179,49 @@ int cmdShaSum(const std::string &path) {
     return 0;
 }
 
+// Load <in>, then write it back out via ObjectMemory::saveSnapshot to
+// <out>. Exercises the create_file + write (DOS AH=40) path — the
+// mirror of the load path that the DOS-port D4 round-trip needs. <in>
+// and <out> must live in the same directory (true for the dosiz
+// staging case under C:); a round-trip is then proven by diffing
+//   st80_validate shasum <in>  vs  st80_validate shasum <out>
+int cmdResave(const std::string &inPath, const std::string &outPath) {
+    const auto in = splitPath(inPath);
+    const auto out = splitPath(outPath);
+    if (out.dir != in.dir && out.dir != ".") {
+        std::fprintf(stderr,
+            "st80_validate: resave needs <in> and <out> in the same "
+            "directory (in dir='%s', out dir='%s')\n",
+            in.dir.c_str(), out.dir.c_str());
+        return 64;
+    }
+    st80::HostFileSystem fs(in.dir);
+    st80::HeadlessHal hal;
+    // Heap-allocate: ObjectMemory embeds 2 MiB RealWordMemory by value
+    // (see tools/st80_run.cpp for the DJGPP stack rationale).
+    auto memoryPtr = std::make_unique<st80::ObjectMemory>(&hal);
+    auto &memory = *memoryPtr;
+
+    if (!memory.loadSnapshot(&fs, in.name.c_str())) {
+        std::fprintf(stderr, "st80_validate: loadSnapshot FAILED\n");
+        return 2;
+    }
+    if (!memory.saveSnapshot(&fs, out.name.c_str())) {
+        std::fprintf(stderr, "st80_validate: saveSnapshot FAILED\n");
+        return 3;
+    }
+    std::fprintf(stderr, "st80_validate: resaved %s -> %s\n",
+                 in.name.c_str(), out.name.c_str());
+    return 0;
+}
+
 void usage() {
     std::fprintf(stderr,
-        "usage: st80_validate <command> <path-to-image>\n"
+        "usage: st80_validate <command> <args>\n"
         "commands:\n"
-        "  check    structural validation; exit 1 if problems\n"
-        "  shasum   per-OOP SHA-256 manifest to stdout\n");
+        "  check  <image>          structural validation; exit 1 if problems\n"
+        "  shasum <image>          per-OOP SHA-256 manifest to stdout\n"
+        "  resave <in> <out>       load then saveSnapshot (write-path test)\n");
 }
 
 } // namespace
@@ -196,6 +233,10 @@ int main(int argc, char **argv) {
 
     if (cmd == "check")  return cmdCheck(path);
     if (cmd == "shasum") return cmdShaSum(path);
+    if (cmd == "resave") {
+        if (argc < 4) { usage(); return 64; }
+        return cmdResave(path, argv[3]);
+    }
 
     usage();
     return 64;
