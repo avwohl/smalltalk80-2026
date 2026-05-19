@@ -200,6 +200,35 @@ int main(int argc, char **argv) {
     const uint32_t *px = syncPixels();
     std::vector<uint32_t> baseline(px, px + size_t(gW) * gH);
 
+    // Assertion 1 — display geometry is sane (the v2 image drives a
+    // 640x480 1-bit screen; allow a wide band so this isn't brittle).
+    if (gW < 64 || gW > 4096 || gH < 64 || gH > 4096) {
+        std::fprintf(stderr,
+            "st80_gui_test: FAIL — implausible display %dx%d\n", gW, gH);
+        st80_shutdown();
+        return 1;
+    }
+
+    // Assertion 2 — the desktop actually rendered. A configured-but-
+    // unpainted screen is a single flat colour (the HAL clears to
+    // 0xFFFFFFFF); a real Blue Book desktop is windows + text + the
+    // ~50%-black stipple background. Require a genuine mix: a healthy
+    // share of non-white pixels, but not a degenerate solid fill.
+    const size_t total = size_t(gW) * gH;
+    size_t nonWhite = 0;
+    for (size_t i = 0; i < total; ++i)
+        if ((baseline[i] & 0x00FFFFFFu) != 0x00FFFFFFu) ++nonWhite;
+    const double frac = double(nonWhite) / double(total);
+    std::printf("st80_gui_test: boot non-white pixels = %zu/%zu (%.1f%%)\n",
+                nonWhite, total, frac * 100.0);
+    if (frac < 0.02 || frac > 0.98) {
+        std::fprintf(stderr,
+            "st80_gui_test: FAIL — boot frame not a rendered desktop "
+            "(non-white %.1f%%, expected 2%%..98%%)\n", frac * 100.0);
+        st80_shutdown();
+        return 1;
+    }
+
     // Fake-GUI interaction: park the cursor mid-desktop and press the
     // yellow (operate) button — in the Blue Book MVC desktop this pops
     // the screen menu. Hold it long enough for the image to open the
@@ -234,6 +263,7 @@ int main(int argc, char **argv) {
             "yellow-click (delta=%ld, expected >=100)\n", menuDelta);
         return 1;
     }
-    std::printf("st80_gui_test: PASS\n");
+    std::printf("st80_gui_test: PASS (geometry + rendered-desktop + "
+                "input-reaction)\n");
     return 0;
 }

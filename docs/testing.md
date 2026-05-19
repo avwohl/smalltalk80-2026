@@ -47,6 +47,22 @@ All under `tests/CMakeLists.txt`:
    every non-DJGPP host; skips (77) if the image is absent. This
    is the harness the "In-image tests" gap below asked for.
 
+5. **`st80_validate_check`** — fast structural gate: load the v2
+   image, walk the whole Object Table, verify every class ref
+   resolves and word lengths are sane. CTest on non-DJGPP hosts;
+   added only when the image is present (no skip plumbing). The
+   DJGPP build runs the same `st80_validate check` under dosiz.
+
+6. **`st80_validate_roundtrip`** — D4 regression gate.
+   `load → saveSnapshot → reload` must reproduce a bit-identical
+   object graph (one SHA-256 over every live object: oop + class
+   + length + body, big-endian). Guards the `create_file`/`write`
+   path — including the dosiz AH=40 + `O_BINARY` path on the DOS
+   port — plus byte-order and OT/page-layout stability. The
+   digest is identical on the native host and under dosiz
+   (`9db7adac…`), so the same gate pins both. Cross-platform, no
+   shell.
+
 ## What's available but not yet wired
 
 1. **`trace3`** — Xerox ships a second reference trace alongside
@@ -57,16 +73,12 @@ All under `tests/CMakeLists.txt`:
    follow. Catches send-receive or stack-frame bugs that `trace2`
    doesn't exercise.
 
-2. **`st80_validate check`** — New in `tools/`. Walks the OT after
-   load and reports dangling class references / bogus word lengths.
-   Not yet a CTest step; should be added as a fast gate alongside
-   the smoke test.
-
-3. **`st80_validate shasum` diffs** — Useful for snapshot
-   regressions: run A, snapshot, run B, snapshot, diff the two
-   manifests to flag any object whose contents changed. Not a test
-   by itself but a debugging lever. CTest could pin the post-boot
-   manifest once we've frozen a baseline.
+2. **`st80_validate shasum` diffs** — still a useful debugging
+   lever for post-boot drift: run A, snapshot, run B, snapshot,
+   diff the two per-OOP manifests to flag any object whose
+   contents changed. CTest could pin the post-boot manifest once
+   we've frozen a baseline. (The static load→save→load case is
+   now covered automatically by `st80_validate_roundtrip` above.)
 
 ## What exists in the world but we haven't imported
 

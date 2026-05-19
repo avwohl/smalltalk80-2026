@@ -215,13 +215,89 @@ int cmdResave(const std::string &inPath, const std::string &outPath) {
     return 0;
 }
 
+// One SHA-256 over every live object (oop + class + length + body,
+// big-endian, host-byte-order-independent). Same per-object scheme as
+// `shasum`, folded into a single digest so two images compare as one
+// hex string. Iteration is deterministic (ascending oop).
+std::string imageDigest(st80::ObjectMemory &memory) {
+    Sha256 h;
+    std::vector<uint8_t> buf;
+    forEachLiveOop(memory, [&](int oop) {
+        const int cls = memory.fetchClassOf(oop);
+        const int n = memory.fetchWordLengthOf(oop);
+        buf.clear();
+        auto push16 = [&](uint16_t v) {
+            buf.push_back(static_cast<uint8_t>((v >> 8) & 0xFF));
+            buf.push_back(static_cast<uint8_t>(v & 0xFF));
+        };
+        push16(static_cast<uint16_t>(oop));
+        push16(static_cast<uint16_t>(cls));
+        push16(static_cast<uint16_t>(n));
+        for (int i = 0; i < n; ++i)
+            push16(static_cast<uint16_t>(memory.fetchWord_ofObject(i, oop)));
+        h.update(buf.data(), buf.size());
+    });
+    return h.hexFinalize();
+}
+
+// Self-contained D4 regression gate: load <image>, saveSnapshot to a
+// sibling temp, reload that, and assert the object graph is identical
+// across the write→read round trip. Cross-platform (no shell), so it
+// runs as a CTest on every host and under dosiz on the DOS port —
+// catches any save/load drift (the dosiz AH=40 / O_BINARY path, byte
+// order, OT/page layout). Exit 0 = identical, 1 = drift, 2 = load/
+// save failure.
+int cmdRoundtrip(const std::string &path) {
+    const auto p = splitPath(path);
+    st80::HostFileSystem fs(p.dir);
+    st80::HeadlessHal hal;
+    const std::string tmp = p.name + ".rtmp";
+
+    std::string digA;
+    {
+        auto m = std::make_unique<st80::ObjectMemory>(&hal);
+        if (!m->loadSnapshot(&fs, p.name.c_str())) {
+            std::fprintf(stderr, "st80_validate: roundtrip load FAILED\n");
+            return 2;
+        }
+        digA = imageDigest(*m);
+        if (!m->saveSnapshot(&fs, tmp.c_str())) {
+            std::fprintf(stderr, "st80_validate: roundtrip save FAILED\n");
+            return 2;
+        }
+    }
+    std::string digB;
+    {
+        auto m = std::make_unique<st80::ObjectMemory>(&hal);
+        if (!m->loadSnapshot(&fs, tmp.c_str())) {
+            std::fprintf(stderr, "st80_validate: roundtrip reload FAILED\n");
+            fs.delete_file(tmp.c_str());
+            return 2;
+        }
+        digB = imageDigest(*m);
+    }
+    fs.delete_file(tmp.c_str());
+
+    if (digA != digB) {
+        std::fprintf(stderr,
+            "st80_validate: roundtrip MISMATCH\n  in : %s\n  out: %s\n",
+            digA.c_str(), digB.c_str());
+        return 1;
+    }
+    std::fprintf(stderr,
+        "st80_validate: roundtrip OK (object graph stable; digest %s)\n",
+        digA.c_str());
+    return 0;
+}
+
 void usage() {
     std::fprintf(stderr,
         "usage: st80_validate <command> <args>\n"
         "commands:\n"
-        "  check  <image>          structural validation; exit 1 if problems\n"
-        "  shasum <image>          per-OOP SHA-256 manifest to stdout\n"
-        "  resave <in> <out>       load then saveSnapshot (write-path test)\n");
+        "  check     <image>       structural validation; exit 1 if problems\n"
+        "  shasum    <image>       per-OOP SHA-256 manifest to stdout\n"
+        "  resave    <in> <out>    load then saveSnapshot (write-path test)\n"
+        "  roundtrip <image>       load->save->reload; exit 1 if graph drifts\n");
 }
 
 } // namespace
@@ -231,8 +307,9 @@ int main(int argc, char **argv) {
     const std::string cmd = argv[1];
     const std::string path = argv[2];
 
-    if (cmd == "check")  return cmdCheck(path);
-    if (cmd == "shasum") return cmdShaSum(path);
+    if (cmd == "check")     return cmdCheck(path);
+    if (cmd == "shasum")    return cmdShaSum(path);
+    if (cmd == "roundtrip") return cmdRoundtrip(path);
     if (cmd == "resave") {
         if (argc < 4) { usage(); return 64; }
         return cmdResave(path, argv[3]);

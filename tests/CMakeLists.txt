@@ -51,3 +51,22 @@ if(NOT DJGPP)
     )
     set_tests_properties(st80_gui_test PROPERTIES SKIP_RETURN_CODE 77)
 endif()
+
+# Image-backed correctness gates. Cross-platform (no shell), so they
+# run on every host; the DJGPP build runs the same .exe under dosiz
+# for the DOS-port gate (see docs/dos-plan.md). Added only when the
+# Xerox image is actually present, so no skip plumbing is needed.
+set(ST80_XEROX_IMAGE ${CMAKE_SOURCE_DIR}/reference/xerox-image/VirtualImage)
+if(NOT DJGPP AND EXISTS ${ST80_XEROX_IMAGE})
+    # Fast structural gate: walk the OT, verify class refs + word
+    # lengths after load. (docs/testing.md asked for this as CTest.)
+    add_test(NAME st80_validate_check
+             COMMAND st80_validate check ${ST80_XEROX_IMAGE})
+
+    # D4 regression gate: load->saveSnapshot->reload must yield a
+    # bit-identical object graph. Guards the create_file/write path
+    # (incl. the dosiz AH=40 + O_BINARY path on the DOS port) and
+    # byte-order / OT-layout stability.
+    add_test(NAME st80_validate_roundtrip
+             COMMAND st80_validate roundtrip ${ST80_XEROX_IMAGE})
+endif()

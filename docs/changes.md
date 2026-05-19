@@ -40,11 +40,23 @@ by the native build.
 `avwohl/pharo-headless-test`. Boots the real image through the
 `Bridge.h` C API, injects synthetic mouse+keyboard, captures
 PNG screenshots (built-in encoder, no deps), and asserts the
-live Smalltalk-80 environment visibly reacts. One source links
-the platform bridge per target: host CI (`st80_windows`/
-`_linux`/`_apple`) and DJGPP (`st80_dos`, runs under dosiz).
-Boot + interaction frames are byte-identical host vs dosiz —
-the DOS port is pixel-exact vs native for input+display too.
+live Smalltalk-80 environment is sane: plausible display
+geometry, a genuinely-rendered desktop (2–98% non-white, not a
+blank/solid frame), and a visible reaction to a synthetic
+yellow-operate click. One source links the platform bridge per
+target: host CI (`st80_windows`/`_linux`/`_apple`) and DJGPP
+(`st80_dos`, runs under dosiz). All three checks are
+byte-identical host vs dosiz — the DOS port is pixel-exact vs
+native for input+display too.
+
+**More automated gates.** `st80_validate` gains a `roundtrip`
+command (load → saveSnapshot → reload must yield a bit-identical
+object graph; one SHA-256 over every live object) wired as the
+`st80_validate_roundtrip` CTest — a cross-platform D4 regression
+gate (same digest on host and under dosiz). `st80_validate
+check` is now also a CTest (`st80_validate_check`). Both added
+only when the Xerox image is present; the DJGPP build runs the
+same commands under dosiz.
 
 (Companion dosiz emulator fixes for the DOS port: AH=3F
 block-read fast path, binary host stdio on Windows, callback
