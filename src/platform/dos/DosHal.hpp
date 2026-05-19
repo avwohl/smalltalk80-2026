@@ -22,7 +22,6 @@
 
 #include <atomic>
 #include <cstdint>
-#include <mutex>
 #include <string>
 #include <vector>
 
@@ -85,7 +84,10 @@ class DosHal : public IHal {
     int displayWidth_ = 0;
     int displayHeight_ = 0;
     std::vector<std::uint32_t> pixels_;
-    std::mutex dirtyMutex_;
+    // No mutex: DOS is single-threaded (cooperative frame loop), so
+    // the Bridge.h same-thread contract makes one unnecessary — and
+    // DJGPP's --disable-threads libstdc++ has no std::mutex anyway
+    // (docs/dos-plan.md Risk #1).
     DirtyRect dirty_{0, 0, 0, 0};
 
     EventQueue events_;

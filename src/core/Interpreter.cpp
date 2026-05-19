@@ -5592,7 +5592,11 @@ float Interpreter::popFloat()
         return extractFloat(objectPointer);
     }
 
-    return std::nanf("");
+    // Failure-path sentinel (success() is already false here, so this
+    // value is never consumed). std::nanf isn't in DJGPP libstdc++'s
+    // std:: namespace; quiet_NaN() is the portable, behaviour-
+    // identical equivalent and works on every target.
+    return std::numeric_limits<float>::quiet_NaN();
 }
 
 }  // namespace st80

@@ -94,7 +94,6 @@ bool DosHal::set_display_size(int width, int height) {
     if (width <= 0 || height <= 0) return false;
     if (width == displayWidth_ && height == displayHeight_) return true;
 
-    std::lock_guard<std::mutex> lock(dirtyMutex_);
     displayWidth_ = width;
     displayHeight_ = height;
     pixels_.assign(static_cast<std::size_t>(width) * height, 0xFFFFFFFFu);
@@ -103,7 +102,6 @@ bool DosHal::set_display_size(int width, int height) {
 }
 
 void DosHal::display_changed(int x, int y, int width, int height) {
-    std::lock_guard<std::mutex> lock(dirtyMutex_);
     if (dirty_.w == 0) {
         dirty_ = {x, y, width, height};
         return;
@@ -116,7 +114,6 @@ void DosHal::display_changed(int x, int y, int width, int height) {
 }
 
 DosHal::DirtyRect DosHal::takeDirtyRect() {
-    std::lock_guard<std::mutex> lock(dirtyMutex_);
     DirtyRect r = dirty_;
     dirty_ = {0, 0, 0, 0};
     return r;

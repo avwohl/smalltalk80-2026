@@ -9,8 +9,23 @@ project(st80-2026
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+# Every host stays strict ISO C++17. DJGPP is the exception: its DOS
+# system headers (<dpmi.h>, <go32.h>, <pc.h>, <bios.h>) and parts of
+# its POSIX layer are hidden under __STRICT_ANSI__, which -std=c++17
+# (extensions off) defines — so the DOS slice genuinely needs
+# -std=gnu++17. DJGPP also has no PIC. Both knobs are gated on
+# NOT DJGPP, so the four shipping ports are byte-for-byte unchanged
+# (DJGPP is only ever set by cmake/toolchain-djgpp.cmake). This is
+# what that toolchain file already intends; it just can't win the
+# override race against these top-level sets, so the gate lives here.
+if(DJGPP)
+    set(CMAKE_CXX_EXTENSIONS ON)
+    set(CMAKE_POSITION_INDEPENDENT_CODE OFF)
+else()
+    set(CMAKE_CXX_EXTENSIONS OFF)
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
     add_compile_options(-Wall -Wextra -Wpedantic)

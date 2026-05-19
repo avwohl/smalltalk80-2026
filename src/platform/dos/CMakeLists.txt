@@ -17,12 +17,19 @@ add_library(st80_dos STATIC
     DosBridge.cpp
 )
 
+# The DOS slice dir comes FIRST so `#include "EventQueue.hpp"` and
+# `#include "HostFileSystem.hpp"` resolve to the DOS copies that
+# shadow src/platform/common + src/platform/posix (single-threaded
+# EventQueue — docs/dos-plan.md Risk #1 — and the PosixFileSystem
+# alias). This shadow-by-include-order is the project's no-#ifdef
+# per-platform mechanism; ordering it wrong silently picks the
+# mutex-guarded common header and fails to build on DJGPP.
 target_include_directories(st80_dos PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/src/include
     ${CMAKE_SOURCE_DIR}/src/core
     ${CMAKE_SOURCE_DIR}/src/platform/posix
     ${CMAKE_SOURCE_DIR}/src/platform/common
-    ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 target_link_libraries(st80_dos PUBLIC st80core)

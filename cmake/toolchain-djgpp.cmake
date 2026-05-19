@@ -27,6 +27,14 @@
 set(CMAKE_SYSTEM_NAME      MSDOS)
 set(CMAKE_SYSTEM_PROCESSOR i386)
 
+# Modern CMake ships no Platform/MSDOS module and won't set `DJGPP`
+# on its own (it just warns "System is unknown to cmake"). The whole
+# DOS build gate is `if(DJGPP)`, so we supply cmake/Platform/MSDOS.cmake
+# and put this directory on the module path; CMake's early
+# `include(Platform/${CMAKE_SYSTEM_NAME} OPTIONAL)` then finds it,
+# sets DJGPP, and the gate fires. Scoped to this toolchain only.
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}")
+
 # DJGPP's cross-compiler is `i586-pc-msdosdjgpp-*`. Let CMake find
 # the compilers on PATH rather than hard-coding an install prefix;
 # every distributor places them differently (brew, apt, manual).
