@@ -82,23 +82,41 @@ in dosiz `src/bridge.cc` (commit `ea3417c`, pushed to dosiz
 origin/main). dosiz's own DJGPP suite went 0 → 11/14 PASS on
 Windows; a trivial DJGPP hello runs clean.
 
-Residual (separate, narrower): `st80_run.exe` now loads + starts
-under dosiz but `#GP`s very early (`POP ES` of a garbage selector
-at CS:EIP 0037:000019f1, before main). Tiny COFF (hello) is fine;
-the ≈805 KB st80_run is not — a size/layout-dependent
-dosiz-Windows bug, correlated with the 3 still-failing dosiz
-suite tests (DJ_FILE/DJ_SIGNAL/EMS_PROBE). Distinct from the
-fixed global hang; tracked for a follow-up dosiz dive. The st80
-port itself builds correctly. Re-run the gate/probe/window once
-that residual is fixed, or on Linux/macOS CI (dosiz suite green
-there). Repro + commands in WIP.md.
+RESOLVED 2026-05-19 — the D1 trace2 gate now passes byte-for-byte
+under dosiz on Windows: `trace2_check: OK (499 bytecodes
+byte-for-byte)`. Four fixes, each at root cause:
+
+  1. st80 `PosixFileSystem.hpp`: `open()` lacked `O_BINARY`.
+     DJGPP defaults `_fmode` to O_TEXT, so the binary snapshot was
+     read with CR/LF folding + 0x1A-as-EOF + an lseek(-1) CR
+     pushback — `Interpreter::init()` failed mid object-table.
+     Added the portable `#ifndef O_BINARY #define O_BINARY 0`
+     shim (no-op on POSIX) and OR-ed it into open/create.
+  2. dosiz `bridge.cc` AH=3F: replaced the one-`::read()`-per-byte
+     loop with a 16 KiB block read for the binary case. The image
+     load issues ~60 K-byte reads; byte-at-a-time made it too slow
+     to finish. Text-mode path preserved unchanged.
+  3. dosiz `dosiz.cc`: forced host std{in,out,err} to binary on
+     Windows (`_setmode`). The MinGW CRT was injecting a 2nd CR
+     into the guest's already-CRLF output (`\r\r\n`); dosiz must
+     be a transparent pipe.
+  4. st80 `tests/trace2_check.sh`: `diff --strip-trailing-cr` so a
+     DOS text-mode `st80_run.exe` (correctly CRLF) compares clean
+     against the Unix-LF reference. No-op on the native path.
+
+The earlier `#GP` was an st80 stack bug (2 MiB RealWordMemory as a
+stack local underflowing DJGPP's small stack), already fixed by
+heap-allocating the VM (commit 9a9b1c8). dosiz's own DJGPP suite
+holds at 35/37 (EMS_PROBE/DJ_SIGNAL pre-existing, unrelated).
 
     D0  Toolchain + empty build            committed (28ac42d)
-    D1  Headless trace2 gate wiring        committed (ddf9a1b)
+    D1  Headless trace2 gate               PASSING byte-for-byte
+                                           under dosiz (2026-05-19)
     D2  VBE display + cursor               code complete (2623ce0)
     D3  Mouse + keyboard                   code complete (2623ce0)
-    D4  Filesystem + snapshot              inherited from D1
-                                           (PosixFileSystem alias)
+    D4  Filesystem + snapshot              VERIFIED via D1 image
+                                           load (PosixFileSystem
+                                           +O_BINARY)
     D5  Packaging                          ZIP target added; release
                                            publish pending verify
     D6  JIT                                deferred to Phase 6
@@ -115,13 +133,12 @@ Debug host — pre-existing and unrelated: the commit changes zero
 `src/core` / `src/include` / `tests` files, so those binaries are
 byte-identical to the pre-change tree.)
 
-Still open before a tagged DOS release (cross-compile is DONE):
-run the trace2 gate under dosiz (D1 exit), boot to the desktop
-under `dosiz --window` and screenshot it (D2/D3 exit), snapshot
-round-trip (D4 exit), 86Box + FreeDOS smoke (D5 exit). All four
-need a working program-execution path — blocked here by the dosiz
-hang above; unblock by fixing dosiz on this host, or run on
-Linux/macOS CI (dosiz's own DJGPP suite is green there).
+Still open before a tagged DOS release (cross-compile DONE; D1
+trace2 gate DONE under dosiz): boot to the desktop under `dosiz
+--window` and screenshot it (D2/D3 exit), snapshot round-trip
+(D4 exit — loader proven, save path still to exercise), 86Box +
+FreeDOS smoke on real DPMI (D5 exit). The program-execution path
+is no longer blocked — st80_run runs end-to-end under dosiz.
 
 ## Goal & non-goals
 

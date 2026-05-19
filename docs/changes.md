@@ -2,6 +2,25 @@
 
 User-visible changes. Most-recent build on top.
 
+## build 36 — 2026-05-19
+
+**DOS port runs end-to-end: the Phase D1 trace2 gate now passes
+byte-for-byte under dosiz.** A DJGPP-cross `st80_run.exe` loads
+the Xerox v2 image and reproduces all 499 reference bytecodes
+exactly (`trace2_check: OK`).
+
+  - `PosixFileSystem`: open files with `O_BINARY`. DJGPP defaults
+    to text mode, which mangled the binary snapshot (CR/LF folding,
+    0x1A-as-EOF) and failed `Interpreter::init()`. Portable shim —
+    `O_BINARY` is 0 on POSIX, so macOS/Linux are unaffected; the
+    native trace2 gate still passes byte-for-byte.
+  - `tests/trace2_check.sh`: compare with `--strip-trailing-cr`. A
+    DOS text-mode program correctly emits CRLF; the reference is
+    Unix LF. No-op on the native path.
+
+(Companion fixes landed in the dosiz emulator: a block-read fast
+path for AH=3F, and binary host stdio on Windows.)
+
 ## build 35 — 2026-04-24
 
 **Apple-side input, clipboard, and icon fixes.** A batch of

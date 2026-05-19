@@ -24,6 +24,16 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+// O_BINARY is a DOS/Windows distinction: it suppresses CR/LF translation
+// and 0x1A-as-EOF on read(). POSIX (macOS/Linux) has no text mode, so
+// <fcntl.h> does not define it — there it must be a no-op. DJGPP *does*
+// define it and, critically, defaults `_fmode` to O_TEXT, so a binary
+// snapshot opened without O_BINARY is mangled (\r\n collapsed, 0x1A =>
+// fake EOF, lseek(-1,SEEK_CUR) CR-pushback). Always OR it into open().
+#ifndef O_BINARY
+#define O_BINARY 0
+#endif
+
 namespace st80 {
 
 class PosixFileSystem : public IFileSystem {
@@ -36,12 +46,12 @@ class PosixFileSystem : public IFileSystem {
 
     int open_file(const char *name) override {
         std::string path = path_for_file(name);
-        return open(path.c_str(), O_RDWR);
+        return open(path.c_str(), O_RDWR | O_BINARY);
     }
 
     int create_file(const char *name) override {
         std::string path = path_for_file(name);
-        return open(path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0644);
+        return open(path.c_str(), O_RDWR | O_CREAT | O_TRUNC | O_BINARY, 0644);
     }
 
     int close_file(int file_handle) override {

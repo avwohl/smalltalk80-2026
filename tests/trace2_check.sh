@@ -51,11 +51,16 @@ else
     "$ST80_RUN" -n "$CYCLES" "$IMAGE" > "$ACTUAL" 2>/dev/null
 fi
 
-if diff -q "$EXPECTED" "$ACTUAL" > /dev/null; then
+# --strip-trailing-cr: the native build writes LF (this is a no-op),
+# but a DJGPP-cross st80_run.exe under the DOS RUNNER emits its trace
+# through a text-mode stdout, so each line is CR LF. That is correct
+# DOS behaviour, not drift — the bytecodes themselves must still match
+# the Unix-LF reference exactly.
+if diff --strip-trailing-cr -q "$EXPECTED" "$ACTUAL" > /dev/null; then
     echo "trace2_check: OK ($CYCLES bytecodes byte-for-byte)"
     exit 0
 fi
 
 echo "trace2_check: MISMATCH — first 20 diff lines:" >&2
-diff "$EXPECTED" "$ACTUAL" | head -20 >&2
+diff --strip-trailing-cr "$EXPECTED" "$ACTUAL" | head -20 >&2
 exit 1
