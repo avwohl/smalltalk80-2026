@@ -1,0 +1,9 @@
+# Shell scripts must stay LF even on Windows checkouts (core.autocrlf
+# would otherwise rewrite them to CRLF, breaking the `#!` line and the
+# bash test gates — tests/trace2_check.sh, tests/dos_dosiz_gate.sh).
+*.sh text eol=lf
+
+# The Xerox reference traces are gold files compared byte-for-byte;
+# never let EOL conversion touch them.
+reference/xerox-image/trace2 -text
+reference/xerox-image/trace3 -text
