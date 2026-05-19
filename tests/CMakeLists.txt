@@ -70,3 +70,27 @@ if(NOT DJGPP AND EXISTS ${ST80_XEROX_IMAGE})
     add_test(NAME st80_validate_roundtrip
              COMMAND st80_validate roundtrip ${ST80_XEROX_IMAGE})
 endif()
+
+# Consolidated DOS-port gate: run the DJGPP-cross binaries under
+# dosiz and assert trace2 + snapshot-roundtrip + fake-GUI all pass
+# (the automated form of the manual per-iteration verification).
+# Needs a separate DJGPP build tree + a dosiz binary, so it lives
+# behind cache vars and the script self-SKIPs (77) when either is
+# absent — CI on a machine without the DOS toolchain stays green.
+# Bash script ⇒ UNIX/git-bash hosts; never under the DJGPP config.
+set(ST80_DOS_BUILD_DIR "${CMAKE_SOURCE_DIR}/build-dos"
+    CACHE PATH "DJGPP CMake build tree for the dosiz DOS-port gate")
+set(ST80_DOSIZ_BIN "/c/temp/src/dosiz/build/dosiz.exe"
+    CACHE FILEPATH "dosiz binary for the DOS-port gate")
+if(UNIX AND NOT DJGPP AND EXISTS ${ST80_XEROX_IMAGE})
+    add_test(
+        NAME dos_dosiz_gate
+        COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/dos_dosiz_gate.sh
+                ${ST80_DOS_BUILD_DIR}
+                ${ST80_XEROX_IMAGE}
+                ${CMAKE_SOURCE_DIR}/reference/xerox-image/trace2
+                ${ST80_DOSIZ_BIN}
+    )
+    set_tests_properties(dos_dosiz_gate PROPERTIES
+        SKIP_RETURN_CODE 77 TIMEOUT 900)
+endif()

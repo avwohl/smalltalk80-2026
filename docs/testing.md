@@ -63,6 +63,22 @@ All under `tests/CMakeLists.txt`:
    (`9db7adac…`), so the same gate pins both. Cross-platform, no
    shell.
 
+7. **`dos_dosiz_gate`** — the consolidated "st80 works fully
+   under dosiz" gate (`tests/dos_dosiz_gate.sh`). Stages the
+   DJGPP-cross binaries into a temp 8.3 dir and runs all three
+   DOS checks inside dosiz in one shot: trace2 byte-for-byte,
+   `st80_validate roundtrip`, and `st80_gui_test`. This is the
+   automated form of the verification previously done by hand
+   each iteration — the regression guard for the DOS port and
+   for dosiz itself. CTest on UNIX/CI (bash); behind the
+   `ST80_DOS_BUILD_DIR` / `ST80_DOSIZ_BIN` cache vars and
+   self-SKIPs (77) when the DJGPP tree or dosiz is absent, so a
+   host without the DOS toolchain stays green. On the Windows
+   dev box it's run directly via git-bash (same as
+   `trace2_check`). Current result: 3/3 PASS (trace2 OK,
+   roundtrip digest `9db7adac…`, fake-GUI Δ4922) — every figure
+   identical to the native host.
+
 ## What's available but not yet wired
 
 1. **`trace3`** — Xerox ships a second reference trace alongside

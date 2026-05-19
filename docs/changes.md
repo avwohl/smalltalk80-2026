@@ -58,6 +58,13 @@ check` is now also a CTest (`st80_validate_check`). Both added
 only when the Xerox image is present; the DJGPP build runs the
 same commands under dosiz.
 
+**One-command DOS-port gate.** `tests/dos_dosiz_gate.sh`
+(CTest `dos_dosiz_gate`, UNIX/CI) stages the DJGPP binaries and
+runs trace2 + snapshot-roundtrip + fake-GUI inside dosiz in a
+single shot — the automated form of the per-iteration manual
+verification. 3/3 PASS, every figure identical to native;
+self-SKIPs where the DOS toolchain/dosiz are absent.
+
 (Companion dosiz emulator fixes for the DOS port: AH=3F
 block-read fast path, binary host stdio on Windows, callback
 pool CB_MAX 128→250 to fix `--window`, and a programmatic
