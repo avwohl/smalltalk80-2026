@@ -120,8 +120,12 @@ holds at 35/37 (EMS_PROBE/DJ_SIGNAL pre-existing, unrelated).
     D0  Toolchain + empty build            committed (28ac42d)
     D1  Headless trace2 gate               PASSING byte-for-byte
                                            under dosiz (2026-05-19)
-    D2  VBE display + cursor               code complete (2623ce0)
-    D3  Mouse + keyboard                   code complete (2623ce0)
+    D2  VBE display + cursor               VERIFIED — desktop
+                                           renders under dosiz
+                                           --window (2026-05-19)
+    D3  Mouse + keyboard                   mouse VERIFIED (cursor
+                                           on screen under --window);
+                                           kbd interaction pending
     D4  Filesystem + snapshot              VERIFIED via D1 image
                                            load (PosixFileSystem
                                            +O_BINARY)
@@ -141,12 +145,28 @@ Debug host — pre-existing and unrelated: the commit changes zero
 `src/core` / `src/include` / `tests` files, so those binaries are
 byte-identical to the pre-change tree.)
 
-Still open before a tagged DOS release (cross-compile DONE; D1
-trace2 gate DONE under dosiz): boot to the desktop under `dosiz
---window` and screenshot it (D2/D3 exit), snapshot round-trip
-(D4 exit — loader proven, save path still to exercise), 86Box +
-FreeDOS smoke on real DPMI (D5 exit). The program-execution path
-is no longer blocked — st80_run runs end-to-end under dosiz.
+D2/D3 GUI VERIFIED 2026-05-19: `dosiz --window st80.exe
+SNAPSHOT.IM` boots to the **fully-rendered Xerox Smalltalk-80 v2
+desktop** — System Workspace ("The Smalltalk-80™ System Version
+2 / Copyright (c) 1983 Xerox Corp."), System Transcript
+("Snapshot at: (31 May 1983 10:37:52 am)"), class-category list,
+gray stipple background, and the mouse cursor on screen (so the
+DOS INT 33h mouse driver is live under --window). Proof image:
+`docs/screenshots/dos-smalltalk-desktop.png` (640×480, st80's
+VBE mode). Verified via a new dosiz feature
+(`DOSIZ_SCREENSHOT_SECS`, dosiz commit b860fbc) that dumps the
+emulated framebuffer to PNG with no interactive display — needed
+because this dev box's session is locked (host screen-grab only
+sees the lock screen) and useful for CI. Two dosiz bugs were
+fixed to get here: the `--window` callback-pool exhaustion
+(CB_MAX 128→250, f18940c) and the screenshot trigger.
+
+Still open before a tagged DOS release: keyboard-interaction
+exercise (type into a workspace, doIt) to fully close D3;
+snapshot round-trip (D4 exit — loader proven byte-identical,
+the AH=40 save path still to exercise end-to-end); 86Box +
+FreeDOS smoke on real DPMI hardware (D5 exit). The headless
+port + GUI render are both done and verified under dosiz.
 
 ## Goal & non-goals
 

@@ -18,8 +18,21 @@ exactly (`trace2_check: OK`).
     DOS text-mode program correctly emits CRLF; the reference is
     Unix LF. No-op on the native path.
 
-(Companion fixes landed in the dosiz emulator: a block-read fast
-path for AH=3F, and binary host stdio on Windows.)
+**The DOS GUI boots to the Smalltalk-80 desktop under dosiz.**
+`dosiz --window st80.exe SNAPSHOT.IM` renders the full Xerox
+Blue Book environment — System Workspace, System Transcript
+("Snapshot at: 31 May 1983"), class-category list, stipple
+desktop, mouse cursor. Visually verified; proof image at
+`docs/screenshots/dos-smalltalk-desktop.png` (640×480 VBE).
+Headless tools also all pass under dosiz: `st80_validate
+shasum` proves all 18391 objects load bit-identically vs the
+native build.
+
+(Companion dosiz emulator fixes for the DOS port: AH=3F
+block-read fast path, binary host stdio on Windows, callback
+pool CB_MAX 128→250 to fix `--window`, and a programmatic
+`DOSIZ_SCREENSHOT_SECS` framebuffer dump for display
+verification with no interactive display / CI.)
 
 ## build 35 — 2026-04-24
 
