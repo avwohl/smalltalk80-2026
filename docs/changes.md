@@ -35,6 +35,17 @@ is identical to the original (18391 objects), and the
 dosiz-written image is byte-for-byte identical to one written
 by the native build.
 
+**Headless "fake GUI" test runner (D3).** New `st80_gui_test`
+(CTest) — the in-repo analog of the referenced
+`avwohl/pharo-headless-test`. Boots the real image through the
+`Bridge.h` C API, injects synthetic mouse+keyboard, captures
+PNG screenshots (built-in encoder, no deps), and asserts the
+live Smalltalk-80 environment visibly reacts. One source links
+the platform bridge per target: host CI (`st80_windows`/
+`_linux`/`_apple`) and DJGPP (`st80_dos`, runs under dosiz).
+Boot + interaction frames are byte-identical host vs dosiz —
+the DOS port is pixel-exact vs native for input+display too.
+
 (Companion dosiz emulator fixes for the DOS port: AH=3F
 block-read fast path, binary host stdio on Windows, callback
 pool CB_MAX 128→250 to fix `--window`, and a programmatic

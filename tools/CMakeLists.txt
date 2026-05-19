@@ -43,3 +43,21 @@ target_include_directories(st80_validate PRIVATE
     ${ST80_TOOLS_FS_EXTRA}
     ${CMAKE_SOURCE_DIR}/src/platform/headless
 )
+
+# st80_gui_test — headless "fake GUI" runner (pharo-headless-test
+# analog). Unlike the tools above it drives the live image through the
+# Bridge.h C API, so it links the platform bridge (which is the same
+# in-memory-framebuffer HAL the real frontends use, no window needed)
+# rather than st80core+HeadlessHal. One source, four link targets;
+# the DJGPP build is what runs under dosiz for the DOS-port gate.
+if(DJGPP)
+    set(ST80_GUI_TEST_BRIDGE st80_dos)
+elseif(WIN32)
+    set(ST80_GUI_TEST_BRIDGE st80_windows)
+elseif(APPLE)
+    set(ST80_GUI_TEST_BRIDGE st80_apple)
+else()
+    set(ST80_GUI_TEST_BRIDGE st80_linux)
+endif()
+add_executable(st80_gui_test st80_gui_test.cpp)
+target_link_libraries(st80_gui_test PRIVATE ${ST80_GUI_TEST_BRIDGE})

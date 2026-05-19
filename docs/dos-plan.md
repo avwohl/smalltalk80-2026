@@ -123,9 +123,10 @@ holds at 35/37 (EMS_PROBE/DJ_SIGNAL pre-existing, unrelated).
     D2  VBE display + cursor               VERIFIED — desktop
                                            renders under dosiz
                                            --window (2026-05-19)
-    D3  Mouse + keyboard                   mouse VERIFIED (cursor
-                                           on screen under --window);
-                                           kbd interaction pending
+    D3  Mouse + keyboard                   VERIFIED — st80_gui_test
+                                           drives synthetic mouse+kbd
+                                           under dosiz; image reacts
+                                           (2026-05-19)
     D4  Filesystem + snapshot              VERIFIED — load+save
                                            round-trip byte-exact
                                            under dosiz (2026-05-19)
@@ -172,13 +173,24 @@ by the native MSVC build — the write path is bit-exact, not
 just semantically equivalent. No dosiz bug needed; AH=40 +
 O_BINARY create worked first try.
 
-Still open before a tagged DOS release: keyboard-interaction
-exercise (type into a workspace, doIt) to fully close D3 —
-needs keystroke injection into a non-interactive dosiz session
-(likely a scripted-keystroke dosiz feature, same pattern as
-the screenshot one); 86Box + FreeDOS smoke on real DPMI
-hardware (D5 exit). Headless port, GUI render, and snapshot
-save round-trip are all done and verified under dosiz.
+D3 VERIFIED 2026-05-19: rather than injecting OS-level keystrokes
+into a non-interactive dosiz window, the pharo-headless-test
+technique was ported — `tools/st80_gui_test` (the in-repo analog;
+see docs/testing.md) drives the live image through `Bridge.h`
+synthetic mouse+keyboard with the framebuffer kept in memory (no
+window). Built for DJGPP it runs under plain headless dosiz
+(no --window, reusing the D4-proven file-write path for its PNG
+output): boots the v2 desktop, a synthetic yellow-operate click
+makes the image visibly react (4922-px delta), PASS. The boot
+and reaction frames are **byte-identical** to the same harness
+linked `st80_windows` on the native host — the DOS port's
+input+display is pixel-exact vs native, same as D1/D4.
+
+Still open before a tagged DOS release: only D5 — 86Box +
+FreeDOS smoke on real DPMI hardware (CWSDPMI/HDPMI32), the one
+gate dosiz can't stand in for. Everything dosiz *can* verify —
+headless trace gate, image load, GUI render, mouse+keyboard
+interaction, snapshot save round-trip — is done and green.
 
 ## Goal & non-goals
 

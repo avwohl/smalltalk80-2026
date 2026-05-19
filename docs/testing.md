@@ -26,6 +26,27 @@ All under `tests/CMakeLists.txt`:
    interpreter or image loader blows up here first. Byte-for-byte
    match is required. Skips if the image or trace file is absent.
 
+4. **`st80_gui_test`** — headless "fake GUI" runner, the in-repo
+   analog of `avwohl/pharo-headless-test` (README "Related").
+   pharo-headless-test installs an in-memory Display Form, injects
+   synthetic events at the Morphic layer, screenshots the Form, and
+   runs SUnit with no display. We have the same seam in the pure-C
+   `Bridge.h` API: `st80_post_mouse_*`/`st80_post_key_*` feed the
+   Sensor, `st80_display_*` return the rendered RGBA framebuffer,
+   and every platform HAL keeps that buffer purely in memory (no
+   window). The test boots the Xerox v2 image through the real
+   platform bridge, drives a synthetic interaction against the live
+   Smalltalk-80 environment, writes PNG screenshots (self-contained
+   encoder, no libpng/zlib), and asserts the image visibly reacts
+   (≥100-pixel framebuffer delta on a yellow-button operate-menu).
+   One source, four link targets: host CI links `st80_windows` /
+   `st80_linux` / `st80_apple`; the DJGPP build links `st80_dos`
+   and runs under dosiz for the DOS-port gate. Host and dosiz
+   produce byte-identical boot + interaction frames (same 4922-px
+   delta) — the DOS port matches native pixel-for-pixel. CTest on
+   every non-DJGPP host; skips (77) if the image is absent. This
+   is the harness the "In-image tests" gap below asked for.
+
 ## What's available but not yet wired
 
 1. **`trace3`** — Xerox ships a second reference trace alongside
