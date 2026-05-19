@@ -129,12 +129,27 @@ dosiz (its whole COFF load completes — opens, header reads,
 payload reads, closes the .exe) but then faults very early:
 `#GP` (vec 13) at CS:EIP `0037:000019f1`, instruction `07`
 (`POP ES`) popping a garbage `0xffff` selector, before `main`.
-HI.EXE (tiny COFF) is fine; st80_run.exe (≈805 KB COFF, loads a
-596 KB image) is not — a size/layout-dependent dosiz-Windows
-bug, correlated with the 3 still-failing suite tests
-(DJ_FILE / DJ_SIGNAL / EMS_PROBE — all narrow feature/edge
-bugs, NOT the global-hang that is now fixed). This is a distinct
-follow-up dosiz investigation, not the execution blocker.
+UPDATE 2026-05-18: two more dosiz Windows bugs found + fixed +
+pushed (dosiz `b6c609c`): PM-aware INT 21h path args, and the
+`dos_to_host` `/C:\...` mangle on create. dosiz's own DJGPP
+suite went **11/14 → 35/37** on Windows (real gawk/tar/gzip/
+sed/flex + C++ all run); DJ_FILE now passes. So general dosiz
+execution on Windows is solid.
+
+st80_run residual narrowed precisely: the fault is the VERY
+FIRST COFF instruction — `<start>` `0x19f0 push %ds` /
+`0x19f1 pop %es` (objdump-confirmed). dosiz hands st80_run.exe
+an INVALID DS selector (~0xffff) at COFF entry. HI.EXE, a
+591 KB C++ test (CXX.EXE), and 35 GNU DJGPP utilities all get
+a valid DS — only `st80_run.exe`/`st80.exe` don't, and it
+reproduces with **no args / no image** (crashes before main),
+so it's NOT the image, interpreter, or size (591 KB C++ is
+fine). A st80-specific COFF trait trips a dosiz DPMI
+segment-setup path. Next: `DOSIZ_DPMI_TRACE` + `DOSIZ_LDT_TRACE`
+at client transfer to see the DS value + which descriptor
+write is wrong; compare st80_run.exe vs CXX.EXE COFF headers.
+Distinct follow-up dosiz dive; the general execution blocker is
+fixed.
 
 The st80 DOS port itself builds correctly (coff-go32-exe). Re-run
 the gate once the residual dosiz-Windows file/DPMI bug is fixed,
